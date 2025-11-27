@@ -2,10 +2,14 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Company, User } from "@/types";
 
+// 開発用デモ会社ID（本番環境ではClerk認証から取得）
+export const DEMO_COMPANY_ID = "demo-company-001";
+
 interface AppState {
   // 現在のユーザー・会社
   user: User | null;
   company: Company | null;
+  companyId: string | null;
 
   // サイドバー状態
   sidebarOpen: boolean;
@@ -18,6 +22,7 @@ interface AppState {
   // アクション
   setUser: (user: User | null) => void;
   setCompany: (company: Company | null) => void;
+  setCompanyId: (companyId: string | null) => void;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   addNotification: (notification: Notification) => void;
@@ -39,6 +44,7 @@ export const useAppStore = create<AppState>()(
     (set) => ({
       user: null,
       company: null,
+      companyId: DEMO_COMPANY_ID, // 開発時はデモ会社IDをデフォルトで設定
       sidebarOpen: true,
       sidebarCollapsed: false,
       notifications: [],
@@ -46,6 +52,7 @@ export const useAppStore = create<AppState>()(
 
       setUser: (user) => set({ user }),
       setCompany: (company) => set({ company }),
+      setCompanyId: (companyId) => set({ companyId }),
 
       toggleSidebar: () =>
         set((state) => ({ sidebarOpen: !state.sidebarOpen })),

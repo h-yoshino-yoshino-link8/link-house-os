@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -46,93 +46,17 @@ import {
   Building,
   Phone,
   Mail,
-  MapPin,
   FileText,
   Home,
   Crown,
   Award,
   Gem,
+  Loader2,
 } from "lucide-react";
 import { CUSTOMER_RANK } from "@/constants";
-
-// デモデータ
-const customers = [
-  {
-    id: "1",
-    type: "individual",
-    name: "山田太郎",
-    email: "yamada@example.com",
-    phone: "090-1234-5678",
-    address: "東京都渋谷区○○1-2-3",
-    tags: ["VIP", "リピーター"],
-    rank: "platinum",
-    totalTransaction: 5200000,
-    points: 24500,
-    estimateCount: 8,
-    projectCount: 5,
-    lastTransaction: new Date("2024-10-15"),
-  },
-  {
-    id: "2",
-    type: "corporate",
-    name: "佐藤建設株式会社",
-    email: "info@sato-kensetsu.co.jp",
-    phone: "03-1234-5678",
-    address: "東京都新宿区○○4-5-6",
-    tags: ["法人", "大口"],
-    rank: "gold",
-    totalTransaction: 3800000,
-    points: 18000,
-    estimateCount: 12,
-    projectCount: 8,
-    lastTransaction: new Date("2024-11-01"),
-  },
-  {
-    id: "3",
-    type: "individual",
-    name: "田中花子",
-    email: "tanaka@example.com",
-    phone: "080-9876-5432",
-    address: "神奈川県横浜市○○7-8-9",
-    tags: ["紹介"],
-    rank: "silver",
-    totalTransaction: 1500000,
-    points: 7500,
-    estimateCount: 3,
-    projectCount: 2,
-    lastTransaction: new Date("2024-09-20"),
-  },
-  {
-    id: "4",
-    type: "individual",
-    name: "鈴木一郎",
-    email: "suzuki@example.com",
-    phone: "070-1111-2222",
-    address: "千葉県船橋市○○10-11",
-    tags: [],
-    rank: "member",
-    totalTransaction: 450000,
-    points: 2250,
-    estimateCount: 2,
-    projectCount: 1,
-    lastTransaction: new Date("2024-08-15"),
-  },
-  {
-    id: "5",
-    type: "corporate",
-    name: "高橋商事株式会社",
-    email: "contact@takahashi-shoji.co.jp",
-    phone: "03-5555-6666",
-    address: "東京都港区○○12-13",
-    tags: ["新規"],
-    rank: "member",
-    totalTransaction: 980000,
-    points: 4900,
-    estimateCount: 4,
-    projectCount: 1,
-    lastTransaction: new Date("2024-11-10"),
-  },
-];
+import { useCustomers, useCreateCustomer, useDeleteCustomer } from "@/hooks/use-customers";
+import { useAppStore, DEMO_COMPANY_ID } from "@/stores/app-store";
+import type { Customer } from "@/lib/api/types";
 
 const rankIcons: Record<string, React.ReactNode> = {
   member: <User className="h-4 w-4" />,
@@ -152,6 +76,77 @@ const rankColors: Record<string, string> = {
 
 export default function CustomersPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [rankFilter, setRankFilter] = useState<string>("all");
+  const [page, setPage] = useState(1);
+
+  // ストアからcompanyIdを取得（開発時はデモID）
+  const companyId = useAppStore((state) => state.companyId) || DEMO_COMPANY_ID;
+
+  // 顧客一覧を取得
+  const { data, isLoading, isError } = useCustomers({
+    companyId,
+    search: search || undefined,
+    rank: rankFilter !== "all" ? rankFilter : undefined,
+    page,
+    limit: 20,
+  });
+
+  const customers = data?.data ?? [];
+  const pagination = data?.pagination;
+
+  // 統計情報の計算
+  const stats = useMemo(() => {
+    if (!customers.length) {
+      return {
+        total: 0,
+        vipCount: 0,
+        avgTransaction: 0,
+      };
+    }
+    const vipCount = customers.filter(
+      (c) => c.rank === "gold" || c.rank === "platinum" || c.rank === "diamond"
+    ).length;
+    const totalTransaction = customers.reduce((sum, c) => sum + Number(c.totalTransaction), 0);
+    return {
+      total: pagination?.total ?? customers.length,
+      vipCount,
+      avgTransaction: totalTransaction / customers.length,
+    };
+  }, [customers, pagination]);
+
+  // 新規顧客作成ミューテーション
+  const createCustomer = useCreateCustomer();
+  const deleteCustomer = useDeleteCustomer();
+
+  const handleCreateCustomer = async (formData: FormData) => {
+    const name = formData.get("name") as string;
+    const type = formData.get("type") as "individual" | "corporate";
+    const phone = formData.get("phone") as string;
+    const email = formData.get("email") as string;
+    const address = formData.get("address") as string;
+    const tagsStr = formData.get("tags") as string;
+    const tags = tagsStr ? tagsStr.split(",").map((t) => t.trim()) : [];
+
+    await createCustomer.mutateAsync({
+      companyId,
+      name,
+      type,
+      phone: phone || undefined,
+      email: email || undefined,
+      address: address || undefined,
+      tags,
+    });
+    setIsDialogOpen(false);
+  };
+
+  if (isError) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <p className="text-muted-foreground">データの取得に失敗しました</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -234,8 +229,14 @@ export default function CustomersPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">156人</div>
-            <p className="text-xs text-muted-foreground">+12人（今月）</p>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{stats.total}人</div>
+                <p className="text-xs text-muted-foreground">登録済み</p>
+              </>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -256,8 +257,16 @@ export default function CustomersPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">¥1.2M</div>
-            <p className="text-xs text-muted-foreground">全期間</p>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">
+                  ¥{(stats.avgTransaction / 1000000).toFixed(1)}M
+                </div>
+                <p className="text-xs text-muted-foreground">全期間</p>
+              </>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -267,8 +276,14 @@ export default function CustomersPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">18人</div>
-            <p className="text-xs text-muted-foreground">ゴールド以上</p>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{stats.vipCount}人</div>
+                <p className="text-xs text-muted-foreground">ゴールド以上</p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -281,9 +296,23 @@ export default function CustomersPage() {
             <div className="flex items-center gap-2">
               <div className="relative w-64">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input placeholder="名前・住所で検索..." className="pl-9" />
+                <Input
+                  placeholder="名前・住所で検索..."
+                  className="pl-9"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
+                />
               </div>
-              <Select defaultValue="all">
+              <Select
+                value={rankFilter}
+                onValueChange={(value) => {
+                  setRankFilter(value);
+                  setPage(1);
+                }}
+              >
                 <SelectTrigger className="w-32">
                   <SelectValue placeholder="ランク" />
                 </SelectTrigger>
@@ -314,100 +343,131 @@ export default function CustomersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {customers.map((customer) => (
-                <TableRow key={customer.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarFallback>
-                          {customer.type === "corporate" ? (
-                            <Building className="h-4 w-4" />
-                          ) : (
-                            customer.name.slice(0, 2)
-                          )}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <Link
-                          href={`/customers/${customer.id}`}
-                          className="font-medium hover:underline"
-                        >
-                          {customer.name}
-                        </Link>
-                        <p className="text-xs text-muted-foreground">
-                          {customer.type === "corporate" ? "法人" : "個人"}
-                        </p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1 text-sm">
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <Phone className="h-3 w-3" />
-                        {customer.phone}
-                      </div>
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <Mail className="h-3 w-3" />
-                        {customer.email}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {customer.tags.map((tag) => (
-                        <Badge key={tag} variant="outline" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={rankColors[customer.rank]}>
-                      <span className="flex items-center gap-1">
-                        {rankIcons[customer.rank]}
-                        {CUSTOMER_RANK[customer.rank as keyof typeof CUSTOMER_RANK]?.label}
-                      </span>
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    ¥{customer.totalTransaction.toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {customer.points.toLocaleString()} pt
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <div className="flex items-center justify-center gap-2 text-sm">
-                      <span className="flex items-center gap-1">
-                        <FileText className="h-3 w-3 text-muted-foreground" />
-                        {customer.estimateCount}
-                      </span>
-                      <span className="text-muted-foreground">/</span>
-                      <span className="flex items-center gap-1">
-                        <Home className="h-3 w-3 text-muted-foreground" />
-                        {customer.projectCount}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>詳細を見る</DropdownMenuItem>
-                        <DropdownMenuItem>編集</DropdownMenuItem>
-                        <DropdownMenuItem>見積を作成</DropdownMenuItem>
-                        <DropdownMenuItem>物件を追加</DropdownMenuItem>
-                        <DropdownMenuItem className="text-red-600">
-                          削除
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="h-32 text-center">
+                    <Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" />
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : customers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
+                    顧客が見つかりませんでした
+                  </TableCell>
+                </TableRow>
+              ) : (
+                customers.map((customer) => (
+                  <TableRow key={customer.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar>
+                          <AvatarFallback>
+                            {customer.type === "corporate" ? (
+                              <Building className="h-4 w-4" />
+                            ) : (
+                              customer.name.slice(0, 2)
+                            )}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <Link
+                            href={`/customers/${customer.id}`}
+                            className="font-medium hover:underline"
+                          >
+                            {customer.name}
+                          </Link>
+                          <p className="text-xs text-muted-foreground">
+                            {customer.type === "corporate" ? "法人" : "個人"}
+                          </p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1 text-sm">
+                        {customer.phone && (
+                          <div className="flex items-center gap-1 text-muted-foreground">
+                            <Phone className="h-3 w-3" />
+                            {customer.phone}
+                          </div>
+                        )}
+                        {customer.email && (
+                          <div className="flex items-center gap-1 text-muted-foreground">
+                            <Mail className="h-3 w-3" />
+                            {customer.email}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {customer.tags?.map((tag) => (
+                          <Badge key={tag} variant="outline" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={rankColors[customer.rank]}>
+                        <span className="flex items-center gap-1">
+                          {rankIcons[customer.rank]}
+                          {CUSTOMER_RANK[customer.rank as keyof typeof CUSTOMER_RANK]?.label}
+                        </span>
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      ¥{Number(customer.totalTransaction).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {customer.points.toLocaleString()} pt
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-2 text-sm">
+                        <span className="flex items-center gap-1">
+                          <FileText className="h-3 w-3 text-muted-foreground" />
+                          {customer._count?.estimates ?? 0}
+                        </span>
+                        <span className="text-muted-foreground">/</span>
+                        <span className="flex items-center gap-1">
+                          <Home className="h-3 w-3 text-muted-foreground" />
+                          {customer._count?.projects ?? 0}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <Link href={`/customers/${customer.id}`}>詳細を見る</Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>編集</DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/estimates/new?customerId=${customer.id}`}>見積を作成</Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/houses/new?customerId=${customer.id}`}>物件を追加</Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-red-600"
+                            onClick={() => {
+                              if (confirm("この顧客を削除しますか？")) {
+                                deleteCustomer.mutate(customer.id);
+                              }
+                            }}
+                          >
+                            削除
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
