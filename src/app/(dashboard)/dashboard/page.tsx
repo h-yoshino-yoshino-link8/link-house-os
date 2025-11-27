@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,10 +13,10 @@ import {
   Users,
   CheckCircle,
   AlertCircle,
-  Clock,
   ArrowRight,
   Trophy,
   Target,
+  Loader2,
 } from "lucide-react";
 import {
   LineChart,
@@ -28,45 +29,51 @@ import {
   BarChart,
   Bar,
 } from "recharts";
-
-// デモデータ
-const revenueData = [
-  { month: "7月", revenue: 8500000, profit: 2100000 },
-  { month: "8月", revenue: 9200000, profit: 2400000 },
-  { month: "9月", revenue: 11000000, profit: 2800000 },
-  { month: "10月", revenue: 10500000, profit: 2700000 },
-  { month: "11月", revenue: 12400000, profit: 3200000 },
-];
-
-const topCustomers = [
-  { name: "山田太郎 様", revenue: 2400000 },
-  { name: "佐藤建設 様", revenue: 1800000 },
-  { name: "田中工務店 様", revenue: 1200000 },
-  { name: "鈴木邸", revenue: 980000 },
-  { name: "高橋商事 様", revenue: 850000 },
-];
-
-const topPartners = [
-  { name: "ABC塗装", amount: 1500000 },
-  { name: "山本電気工事", amount: 1200000 },
-  { name: "中村設備", amount: 980000 },
-  { name: "大和クロス", amount: 750000 },
-  { name: "佐々木建材", amount: 620000 },
-];
-
-const alerts = [
-  { id: 1, type: "warning", title: "見積#1234 山田邸", description: "有効期限まで2日", link: "/estimates/1234" },
-  { id: 2, type: "info", title: "工事#5678 佐藤邸", description: "工程遅延の可能性", link: "/projects/5678" },
-  { id: 3, type: "success", title: "請求#9012 田中邸", description: "入金確認待ち", link: "/projects/9012" },
-];
-
-const quests = [
-  { id: 1, title: "見積を1件作成する", xp: 50, completed: false },
-  { id: 2, title: "ログインボーナス獲得済み", xp: 10, completed: true },
-  { id: 3, title: "顧客フォローアップ", xp: 30, completed: false },
-];
+import { useDashboard } from "@/hooks/use-dashboard";
+import { useAppStore, DEMO_COMPANY_ID } from "@/stores/app-store";
 
 export default function DashboardPage() {
+  const companyId = useAppStore((state) => state.companyId) || DEMO_COMPANY_ID;
+  const { data, isLoading, isError } = useDashboard({ companyId });
+
+  const dashboard = data?.data;
+
+  if (isError) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <p className="text-muted-foreground">データの取得に失敗しました</p>
+      </div>
+    );
+  }
+
+  // ローディング中のスケルトン
+  if (isLoading || !dashboard) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">ダッシュボード</h1>
+            <p className="text-muted-foreground">今月のサマリーと重要な指標</p>
+          </div>
+          <Button asChild>
+            <Link href="/estimates/new">
+              <FileText className="mr-2 h-4 w-4" />
+              新規見積作成
+            </Link>
+          </Button>
+        </div>
+        <div className="flex h-[50vh] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
+
+  const { kpis, revenueData, topCustomers, alerts, quests, highlights, gamification } = dashboard;
+
+  const completedQuests = quests.filter(q => q.completed).length;
+  const questProgress = (completedQuests / quests.length) * 100;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -75,9 +82,11 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-bold">ダッシュボード</h1>
           <p className="text-muted-foreground">今月のサマリーと重要な指標</p>
         </div>
-        <Button>
-          <FileText className="mr-2 h-4 w-4" />
-          新規見積作成
+        <Button asChild>
+          <Link href="/estimates/new">
+            <FileText className="mr-2 h-4 w-4" />
+            新規見積作成
+          </Link>
         </Button>
       </div>
 
@@ -89,10 +98,16 @@ export default function DashboardPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">¥12.4M</div>
-            <div className="flex items-center text-xs text-green-600">
-              <TrendingUp className="mr-1 h-3 w-3" />
-              +18% 前月比
+            <div className="text-2xl font-bold">
+              ¥{(kpis.revenue.value / 1000000).toFixed(1)}M
+            </div>
+            <div className={`flex items-center text-xs ${kpis.revenue.trend === "up" ? "text-green-600" : "text-red-600"}`}>
+              {kpis.revenue.trend === "up" ? (
+                <TrendingUp className="mr-1 h-3 w-3" />
+              ) : (
+                <TrendingDown className="mr-1 h-3 w-3" />
+              )}
+              {kpis.revenue.change >= 0 ? "+" : ""}{kpis.revenue.change.toFixed(0)}% 前月比
             </div>
           </CardContent>
         </Card>
@@ -103,10 +118,16 @@ export default function DashboardPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">¥3.2M</div>
-            <div className="flex items-center text-xs text-green-600">
-              <TrendingUp className="mr-1 h-3 w-3" />
-              +12% 前月比
+            <div className="text-2xl font-bold">
+              ¥{(kpis.profit.value / 1000000).toFixed(1)}M
+            </div>
+            <div className={`flex items-center text-xs ${kpis.profit.trend === "up" ? "text-green-600" : "text-red-600"}`}>
+              {kpis.profit.trend === "up" ? (
+                <TrendingUp className="mr-1 h-3 w-3" />
+              ) : (
+                <TrendingDown className="mr-1 h-3 w-3" />
+              )}
+              {kpis.profit.change >= 0 ? "+" : ""}{kpis.profit.change.toFixed(0)}% 前月比
             </div>
           </CardContent>
         </Card>
@@ -117,10 +138,14 @@ export default function DashboardPage() {
             <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">42%</div>
-            <div className="flex items-center text-xs text-green-600">
-              <TrendingUp className="mr-1 h-3 w-3" />
-              +5pt 前月比
+            <div className="text-2xl font-bold">{kpis.orderRate.value.toFixed(0)}%</div>
+            <div className={`flex items-center text-xs ${kpis.orderRate.trend === "up" ? "text-green-600" : "text-red-600"}`}>
+              {kpis.orderRate.trend === "up" ? (
+                <TrendingUp className="mr-1 h-3 w-3" />
+              ) : (
+                <TrendingDown className="mr-1 h-3 w-3" />
+              )}
+              {kpis.orderRate.change >= 0 ? "+" : ""}{kpis.orderRate.change.toFixed(0)}pt 前月比
             </div>
           </CardContent>
         </Card>
@@ -131,10 +156,14 @@ export default function DashboardPage() {
             <CheckCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">8件</div>
-            <div className="flex items-center text-xs text-green-600">
-              <TrendingUp className="mr-1 h-3 w-3" />
-              +2件 前月比
+            <div className="text-2xl font-bold">{kpis.completedProjects.value}件</div>
+            <div className={`flex items-center text-xs ${kpis.completedProjects.trend === "up" ? "text-green-600" : "text-red-600"}`}>
+              {kpis.completedProjects.trend === "up" ? (
+                <TrendingUp className="mr-1 h-3 w-3" />
+              ) : (
+                <TrendingDown className="mr-1 h-3 w-3" />
+              )}
+              {kpis.completedProjects.change >= 0 ? "+" : ""}{kpis.completedProjects.change}件 前月比
             </div>
           </CardContent>
         </Card>
@@ -190,27 +219,35 @@ export default function DashboardPage() {
         <Card className="lg:col-span-3">
           <CardHeader>
             <CardTitle>ランキング</CardTitle>
-            <CardDescription>今月の顧客TOP5</CardDescription>
+            <CardDescription>顧客取引額TOP5</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {topCustomers.map((customer, index) => (
-                <div key={customer.name} className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted font-bold text-sm">
-                    {index + 1}
+              {topCustomers.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  データがありません
+                </p>
+              ) : (
+                topCustomers.map((customer, index) => (
+                  <div key={customer.name} className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted font-bold text-sm">
+                      {index + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{customer.name}</p>
+                    </div>
+                    <div className="text-sm font-medium">
+                      ¥{(customer.revenue / 10000).toFixed(0)}万
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{customer.name}</p>
-                  </div>
-                  <div className="text-sm font-medium">
-                    ¥{(customer.revenue / 10000).toFixed(0)}万
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
-            <Button variant="link" className="mt-4 w-full">
-              すべてのランキングを見る
-              <ArrowRight className="ml-2 h-4 w-4" />
+            <Button variant="link" className="mt-4 w-full" asChild>
+              <Link href="/customers">
+                すべての顧客を見る
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
             </Button>
           </CardContent>
         </Card>
@@ -227,29 +264,36 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {alerts.map((alert) => (
-                <div
-                  key={alert.id}
-                  className="flex items-start gap-3 rounded-lg border p-3 hover:bg-muted/50 cursor-pointer transition-colors"
-                >
-                  {alert.type === "warning" && (
-                    <div className="h-2 w-2 mt-2 rounded-full bg-red-500" />
-                  )}
-                  {alert.type === "info" && (
-                    <div className="h-2 w-2 mt-2 rounded-full bg-yellow-500" />
-                  )}
-                  {alert.type === "success" && (
-                    <div className="h-2 w-2 mt-2 rounded-full bg-green-500" />
-                  )}
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{alert.title}</p>
-                    <p className="text-xs text-muted-foreground">{alert.description}</p>
-                  </div>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                </div>
-              ))}
-            </div>
+            {alerts.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                対応が必要な項目はありません
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {alerts.map((alert) => (
+                  <Link
+                    key={alert.id}
+                    href={alert.link}
+                    className="flex items-start gap-3 rounded-lg border p-3 hover:bg-muted/50 cursor-pointer transition-colors"
+                  >
+                    {alert.type === "warning" && (
+                      <div className="h-2 w-2 mt-2 rounded-full bg-red-500" />
+                    )}
+                    {alert.type === "info" && (
+                      <div className="h-2 w-2 mt-2 rounded-full bg-yellow-500" />
+                    )}
+                    {alert.type === "success" && (
+                      <div className="h-2 w-2 mt-2 rounded-full bg-green-500" />
+                    )}
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{alert.title}</p>
+                      <p className="text-xs text-muted-foreground">{alert.description}</p>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                  </Link>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -298,47 +342,37 @@ export default function DashboardPage() {
             </div>
             <div className="mt-4 flex items-center justify-between text-sm">
               <span className="text-muted-foreground">今日の進捗</span>
-              <span className="font-medium">1/3 完了</span>
+              <span className="font-medium">{completedQuests}/{quests.length} 完了</span>
             </div>
-            <Progress value={33} className="mt-2" />
+            <Progress value={questProgress} className="mt-2" />
           </CardContent>
         </Card>
       </div>
 
-      {/* Partner Rankings */}
+      {/* Highlights */}
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>協力会社ランキング</CardTitle>
-            <CardDescription>今月の発注金額TOP5</CardDescription>
+            <CardTitle>月間目標達成状況</CardTitle>
+            <CardDescription>目標: ¥{(highlights.targetAchievement.target / 10000).toLocaleString()}万</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topPartners} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis
-                    type="number"
-                    tickFormatter={(value) => `${(value / 10000).toFixed(0)}万`}
-                    className="text-xs"
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    width={100}
-                    className="text-xs"
-                  />
-                  <Tooltip
-                    formatter={(value: number) => `¥${value.toLocaleString()}`}
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--background))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Bar dataKey="amount" fill="hsl(var(--primary))" radius={4} />
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-2xl font-bold">
+                  {highlights.targetAchievement.rate}%
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  ¥{(highlights.targetAchievement.actual / 10000).toLocaleString()}万 / ¥{(highlights.targetAchievement.target / 10000).toLocaleString()}万
+                </span>
+              </div>
+              <Progress value={Math.min(highlights.targetAchievement.rate, 100)} className="h-3" />
+              {highlights.targetAchievement.achieved && (
+                <div className="flex items-center gap-2 rounded-md bg-green-50 dark:bg-green-950/20 p-3 text-green-700 dark:text-green-400">
+                  <Trophy className="h-5 w-5 text-yellow-500" />
+                  <span className="text-sm font-medium">月間目標を達成しました!</span>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -348,30 +382,30 @@ export default function DashboardPage() {
             <CardTitle>今月のハイライト</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center gap-4 rounded-lg bg-green-50 dark:bg-green-950/20 p-4">
-              <Trophy className="h-8 w-8 text-yellow-500" />
-              <div>
-                <p className="font-medium">月間受注目標達成！</p>
-                <p className="text-sm text-muted-foreground">
-                  目標1,000万円に対して1,240万円（124%）
-                </p>
-              </div>
-            </div>
             <div className="flex items-center gap-4 rounded-lg bg-blue-50 dark:bg-blue-950/20 p-4">
               <Users className="h-8 w-8 text-blue-500" />
               <div>
-                <p className="font-medium">新規顧客3件獲得</p>
+                <p className="font-medium">新規顧客 {highlights.newCustomers}件獲得</p>
                 <p className="text-sm text-muted-foreground">
-                  紹介経由2件、Web問合せ1件
+                  今月の新規登録顧客数
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-4 rounded-lg bg-purple-50 dark:bg-purple-950/20 p-4">
               <CheckCircle className="h-8 w-8 text-purple-500" />
               <div>
-                <p className="font-medium">顧客満足度 4.8</p>
+                <p className="font-medium">{highlights.completedProjects}件完工</p>
                 <p className="text-sm text-muted-foreground">
-                  今月完工した8件の平均評価
+                  今月の完工プロジェクト数
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 rounded-lg bg-amber-50 dark:bg-amber-950/20 p-4">
+              <Trophy className="h-8 w-8 text-amber-500" />
+              <div>
+                <p className="font-medium">レベル {gamification.level}</p>
+                <p className="text-sm text-muted-foreground">
+                  次のレベルまであと {gamification.xpToNextLevel} XP
                 </p>
               </div>
             </div>
