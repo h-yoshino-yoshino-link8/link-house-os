@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -29,15 +28,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Plus,
   Search,
   Upload,
   Camera,
   Image,
-  FolderOpen,
   Grid,
   List,
   Download,
@@ -45,11 +41,6 @@ import {
   Edit,
   Eye,
   MoreHorizontal,
-  Calendar,
-  MapPin,
-  Tag,
-  FileText,
-  ZoomIn,
   PenTool,
   Circle,
   ArrowRight,
@@ -58,9 +49,15 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  FileText,
+  ZoomIn,
+  Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
-import { ja } from "date-fns/locale";
+import { usePhotos, useDeletePhotos } from "@/hooks/use-photos";
+import { useProjects } from "@/hooks/use-projects";
+import { useAppStore, DEMO_COMPANY_ID } from "@/stores/app-store";
+import { toast } from "sonner";
 
 // 写真カテゴリ
 const PHOTO_CATEGORIES = {
@@ -72,121 +69,73 @@ const PHOTO_CATEGORIES = {
   material: { label: "資材", color: "bg-gray-100 text-gray-800" },
 } as const;
 
-// デモデータ
-const projects = [
-  { id: "1", name: "山田邸 キッチンリフォーム", photoCount: 48 },
-  { id: "2", name: "佐藤邸 外壁塗装", photoCount: 124 },
-  { id: "3", name: "田中邸 浴室リフォーム", photoCount: 36 },
-];
-
-const photos = [
-  {
-    id: "1",
-    projectId: "1",
-    projectName: "山田邸 キッチンリフォーム",
-    filename: "kitchen_before_01.jpg",
-    category: "before",
-    title: "キッチン全景（施工前）",
-    description: "施工前のキッチン全体写真",
-    takenAt: new Date("2024-10-01"),
-    uploadedAt: new Date("2024-10-01"),
-    hasAnnotations: false,
-    thumbnail: "/api/placeholder/400/300",
-  },
-  {
-    id: "2",
-    projectId: "1",
-    projectName: "山田邸 キッチンリフォーム",
-    filename: "kitchen_before_02.jpg",
-    category: "before",
-    title: "シンク周り（施工前）",
-    description: "シンク周りの状態確認",
-    takenAt: new Date("2024-10-01"),
-    uploadedAt: new Date("2024-10-01"),
-    hasAnnotations: true,
-    thumbnail: "/api/placeholder/400/300",
-  },
-  {
-    id: "3",
-    projectId: "1",
-    projectName: "山田邸 キッチンリフォーム",
-    filename: "kitchen_during_01.jpg",
-    category: "during",
-    title: "配管工事中",
-    description: "給排水配管の入替作業",
-    takenAt: new Date("2024-10-15"),
-    uploadedAt: new Date("2024-10-15"),
-    hasAnnotations: true,
-    thumbnail: "/api/placeholder/400/300",
-  },
-  {
-    id: "4",
-    projectId: "1",
-    projectName: "山田邸 キッチンリフォーム",
-    filename: "kitchen_issue_01.jpg",
-    category: "issue",
-    title: "壁内配管腐食",
-    description: "壁内の配管に腐食を発見。交換が必要。",
-    takenAt: new Date("2024-10-16"),
-    uploadedAt: new Date("2024-10-16"),
-    hasAnnotations: true,
-    thumbnail: "/api/placeholder/400/300",
-  },
-  {
-    id: "5",
-    projectId: "1",
-    projectName: "山田邸 キッチンリフォーム",
-    filename: "kitchen_after_01.jpg",
-    category: "after",
-    title: "キッチン全景（施工後）",
-    description: "施工完了後のキッチン全体写真",
-    takenAt: new Date("2024-11-01"),
-    uploadedAt: new Date("2024-11-01"),
-    hasAnnotations: false,
-    thumbnail: "/api/placeholder/400/300",
-  },
-  {
-    id: "6",
-    projectId: "2",
-    projectName: "佐藤邸 外壁塗装",
-    filename: "wall_before_01.jpg",
-    category: "before",
-    title: "外壁南面（施工前）",
-    description: "南面の外壁状態",
-    takenAt: new Date("2024-09-15"),
-    uploadedAt: new Date("2024-09-15"),
-    hasAnnotations: false,
-    thumbnail: "/api/placeholder/400/300",
-  },
-];
-
 export default function PhotosPage() {
+  const companyId = useAppStore((state) => state.companyId) || DEMO_COMPANY_ID;
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
-  const [selectedPhoto, setSelectedPhoto] = useState<typeof photos[0] | null>(null);
+  const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
   const [selectedProject, setSelectedProject] = useState<string>("all");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedPhotos, setSelectedPhotos] = useState<string[]>([]);
+  const [page, setPage] = useState(1);
 
-  const filteredPhotos = photos.filter(photo => {
-    if (selectedProject !== "all" && photo.projectId !== selectedProject) return false;
-    if (selectedCategory !== "all" && photo.category !== selectedCategory) return false;
-    return true;
+  // APIからデータ取得
+  const { data: photosData, isLoading, isError } = usePhotos({
+    companyId,
+    projectId: selectedProject !== "all" ? selectedProject : undefined,
+    folder: selectedCategory !== "all" ? selectedCategory : undefined,
+    page,
+    limit: 20,
   });
 
+  const { data: projectsData } = useProjects({
+    companyId,
+    limit: 100,
+  });
+
+  const deletePhotos = useDeletePhotos();
+
+  const photos = photosData?.data ?? [];
+  const stats = photosData?.stats;
+  const pagination = photosData?.pagination;
+  const projects = projectsData?.data ?? [];
+
+  const selectedPhoto = photos.find((p) => p.id === selectedPhotoId);
+
   const togglePhotoSelection = (photoId: string) => {
-    setSelectedPhotos(prev =>
+    setSelectedPhotos((prev) =>
       prev.includes(photoId)
-        ? prev.filter(id => id !== photoId)
+        ? prev.filter((id) => id !== photoId)
         : [...prev, photoId]
     );
   };
 
-  const openViewer = (photo: typeof photos[0]) => {
-    setSelectedPhoto(photo);
+  const openViewer = (photoId: string) => {
+    setSelectedPhotoId(photoId);
     setIsViewerOpen(true);
   };
+
+  const handleDeleteSelected = async () => {
+    if (selectedPhotos.length === 0) return;
+    if (!confirm(`${selectedPhotos.length}枚の写真を削除しますか？`)) return;
+
+    try {
+      await deletePhotos.mutateAsync(selectedPhotos);
+      toast.success(`${selectedPhotos.length}枚の写真を削除しました`);
+      setSelectedPhotos([]);
+    } catch {
+      toast.error("削除に失敗しました");
+    }
+  };
+
+  if (isError) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <p className="text-muted-foreground">データの取得に失敗しました</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -233,9 +182,9 @@ export default function PhotosPage() {
                         <SelectValue placeholder="案件を選択" />
                       </SelectTrigger>
                       <SelectContent>
-                        {projects.map(project => (
+                        {projects.map((project) => (
                           <SelectItem key={project.id} value={project.id}>
-                            {project.name}
+                            {project.title}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -280,17 +229,37 @@ export default function PhotosPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1,248枚</div>
+            <div className="text-2xl font-bold">{stats?.total ?? 0}枚</div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              今月アップロード
+              施工前
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">186枚</div>
+            <div className="text-2xl font-bold">{stats?.byFolder?.before ?? 0}枚</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              施工中
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats?.byFolder?.during ?? 0}枚</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              施工後
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{stats?.byFolder?.after ?? 0}枚</div>
           </CardContent>
         </Card>
         <Card>
@@ -300,28 +269,7 @@ export default function PhotosPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">324枚</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              問題箇所
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">18枚</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              使用容量
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">4.2GB</div>
-            <p className="text-xs text-muted-foreground">/10GB</p>
+            <div className="text-2xl font-bold text-blue-600">{stats?.annotated ?? 0}枚</div>
           </CardContent>
         </Card>
       </div>
@@ -333,20 +281,20 @@ export default function PhotosPage() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input placeholder="ファイル名・説明で検索..." className="pl-9" />
           </div>
-          <Select value={selectedProject} onValueChange={setSelectedProject}>
+          <Select value={selectedProject} onValueChange={(v) => { setSelectedProject(v); setPage(1); }}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="案件" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">すべての案件</SelectItem>
-              {projects.map(project => (
+              {projects.map((project) => (
                 <SelectItem key={project.id} value={project.id}>
-                  {project.name}
+                  {project.title}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+          <Select value={selectedCategory} onValueChange={(v) => { setSelectedCategory(v); setPage(1); }}>
             <SelectTrigger className="w-32">
               <SelectValue placeholder="カテゴリ" />
             </SelectTrigger>
@@ -370,8 +318,18 @@ export default function PhotosPage() {
                 <Download className="h-4 w-4 mr-1" />
                 一括DL
               </Button>
-              <Button variant="outline" size="sm" className="text-red-600">
-                <Trash className="h-4 w-4 mr-1" />
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-red-600"
+                onClick={handleDeleteSelected}
+                disabled={deletePhotos.isPending}
+              >
+                {deletePhotos.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Trash className="h-4 w-4 mr-1" />
+                )}
                 削除
               </Button>
             </>
@@ -396,9 +354,17 @@ export default function PhotosPage() {
       </div>
 
       {/* Photo Grid / List */}
-      {viewMode === "grid" ? (
+      {isLoading ? (
+        <div className="flex h-64 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : photos.length === 0 ? (
+        <div className="flex h-64 items-center justify-center text-muted-foreground">
+          写真がありません
+        </div>
+      ) : viewMode === "grid" ? (
         <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          {filteredPhotos.map((photo) => {
+          {photos.map((photo) => {
             const categoryInfo = PHOTO_CATEGORIES[photo.category as keyof typeof PHOTO_CATEGORIES];
             const isSelected = selectedPhotos.includes(photo.id);
             return (
@@ -407,9 +373,17 @@ export default function PhotosPage() {
                 className={`overflow-hidden cursor-pointer group ${isSelected ? "ring-2 ring-primary" : ""}`}
               >
                 <div className="relative aspect-[4/3] bg-muted">
-                  <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
-                    <Image className="h-12 w-12" />
-                  </div>
+                  {photo.thumbnailUrl ? (
+                    <img
+                      src={photo.thumbnailUrl}
+                      alt={photo.title}
+                      className="object-cover w-full h-full"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+                      <Image className="h-12 w-12" />
+                    </div>
+                  )}
                   {/* Selection Checkbox */}
                   <div className="absolute top-2 left-2">
                     <Checkbox
@@ -419,9 +393,11 @@ export default function PhotosPage() {
                     />
                   </div>
                   {/* Category Badge */}
-                  <Badge className={`absolute top-2 right-2 ${categoryInfo?.color}`}>
-                    {categoryInfo?.label}
-                  </Badge>
+                  {categoryInfo && (
+                    <Badge className={`absolute top-2 right-2 ${categoryInfo.color}`}>
+                      {categoryInfo.label}
+                    </Badge>
+                  )}
                   {/* Annotations Indicator */}
                   {photo.hasAnnotations && (
                     <div className="absolute bottom-2 right-2 bg-blue-600 text-white rounded-full p-1">
@@ -430,7 +406,7 @@ export default function PhotosPage() {
                   )}
                   {/* Hover Actions */}
                   <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                    <Button size="sm" variant="secondary" onClick={() => openViewer(photo)}>
+                    <Button size="sm" variant="secondary" onClick={() => openViewer(photo.id)}>
                       <Eye className="h-4 w-4 mr-1" />
                       表示
                     </Button>
@@ -443,9 +419,11 @@ export default function PhotosPage() {
                 <CardContent className="p-3">
                   <p className="font-medium text-sm truncate">{photo.title}</p>
                   <p className="text-xs text-muted-foreground truncate">{photo.projectName}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {format(photo.takenAt, "yyyy/MM/dd")}
-                  </p>
+                  {photo.takenAt && (
+                    <p className="text-xs text-muted-foreground">
+                      {format(new Date(photo.takenAt), "yyyy/MM/dd")}
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             );
@@ -469,7 +447,7 @@ export default function PhotosPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredPhotos.map((photo) => {
+                {photos.map((photo) => {
                   const categoryInfo = PHOTO_CATEGORIES[photo.category as keyof typeof PHOTO_CATEGORIES];
                   return (
                     <tr key={photo.id} className="border-b hover:bg-muted/50">
@@ -481,8 +459,12 @@ export default function PhotosPage() {
                       </td>
                       <td className="p-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-16 h-12 bg-muted rounded flex items-center justify-center">
-                            <Image className="h-6 w-6 text-muted-foreground" />
+                          <div className="w-16 h-12 bg-muted rounded flex items-center justify-center overflow-hidden">
+                            {photo.thumbnailUrl ? (
+                              <img src={photo.thumbnailUrl} alt="" className="object-cover w-full h-full" />
+                            ) : (
+                              <Image className="h-6 w-6 text-muted-foreground" />
+                            )}
                           </div>
                           {photo.hasAnnotations && (
                             <Badge variant="outline" className="text-xs">
@@ -494,14 +476,15 @@ export default function PhotosPage() {
                       </td>
                       <td className="p-3">
                         <p className="font-medium">{photo.title}</p>
-                        <p className="text-xs text-muted-foreground">{photo.filename}</p>
                       </td>
                       <td className="p-3 text-sm">{photo.projectName}</td>
                       <td className="p-3">
-                        <Badge className={categoryInfo?.color}>{categoryInfo?.label}</Badge>
+                        {categoryInfo && (
+                          <Badge className={categoryInfo.color}>{categoryInfo.label}</Badge>
+                        )}
                       </td>
                       <td className="p-3 text-sm">
-                        {format(photo.takenAt, "yyyy/MM/dd")}
+                        {photo.takenAt && format(new Date(photo.takenAt), "yyyy/MM/dd")}
                       </td>
                       <td className="p-3">
                         <DropdownMenu>
@@ -511,7 +494,7 @@ export default function PhotosPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openViewer(photo)}>
+                            <DropdownMenuItem onClick={() => openViewer(photo.id)}>
                               <Eye className="h-4 w-4 mr-2" />
                               表示
                             </DropdownMenuItem>
@@ -544,6 +527,31 @@ export default function PhotosPage() {
         </Card>
       )}
 
+      {/* Pagination */}
+      {pagination && pagination.totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page <= 1}
+            onClick={() => setPage(page - 1)}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            {page} / {pagination.totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page >= pagination.totalPages}
+            onClick={() => setPage(page + 1)}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
       {/* Photo Viewer Dialog */}
       <Dialog open={isViewerOpen} onOpenChange={setIsViewerOpen}>
         <DialogContent className="max-w-5xl h-[90vh] p-0 overflow-hidden">
@@ -571,25 +579,15 @@ export default function PhotosPage() {
 
               {/* Image */}
               <div className="flex-1 flex items-center justify-center relative">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute left-4 text-white hover:bg-white/20"
-                >
-                  <ChevronLeft className="h-8 w-8" />
-                </Button>
                 <div className="w-full h-full flex items-center justify-center">
-                  <div className="bg-muted rounded-lg w-[600px] h-[400px] flex items-center justify-center">
-                    <Image className="h-24 w-24 text-muted-foreground" />
-                  </div>
+                  {selectedPhoto?.url ? (
+                    <img src={selectedPhoto.url} alt={selectedPhoto.title} className="max-h-full max-w-full object-contain" />
+                  ) : (
+                    <div className="bg-muted rounded-lg w-[600px] h-[400px] flex items-center justify-center">
+                      <Image className="h-24 w-24 text-muted-foreground" />
+                    </div>
+                  )}
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-4 text-white hover:bg-white/20"
-                >
-                  <ChevronRight className="h-8 w-8" />
-                </Button>
               </div>
 
               {/* Annotation Tools */}
@@ -620,18 +618,20 @@ export default function PhotosPage() {
                   <h4 className="font-medium mb-2">写真情報</h4>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">ファイル名</span>
-                      <span>{selectedPhoto?.filename}</span>
+                      <span className="text-muted-foreground">案件</span>
+                      <span>{selectedPhoto?.projectName}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">撮影日</span>
-                      <span>{selectedPhoto && format(selectedPhoto.takenAt, "yyyy/MM/dd")}</span>
+                      <span>{selectedPhoto?.takenAt && format(new Date(selectedPhoto.takenAt), "yyyy/MM/dd")}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">カテゴリ</span>
-                      <Badge className={selectedPhoto ? PHOTO_CATEGORIES[selectedPhoto.category as keyof typeof PHOTO_CATEGORIES]?.color : ""}>
-                        {selectedPhoto && PHOTO_CATEGORIES[selectedPhoto.category as keyof typeof PHOTO_CATEGORIES]?.label}
-                      </Badge>
+                      {selectedPhoto?.category && (
+                        <Badge className={PHOTO_CATEGORIES[selectedPhoto.category as keyof typeof PHOTO_CATEGORIES]?.color}>
+                          {PHOTO_CATEGORIES[selectedPhoto.category as keyof typeof PHOTO_CATEGORIES]?.label}
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -639,29 +639,14 @@ export default function PhotosPage() {
                 <div>
                   <h4 className="font-medium mb-2">説明</h4>
                   <p className="text-sm text-muted-foreground">
-                    {selectedPhoto?.description}
+                    {selectedPhoto?.caption || "説明なし"}
                   </p>
                 </div>
 
                 <div>
                   <h4 className="font-medium mb-2">注釈</h4>
                   {selectedPhoto?.hasAnnotations ? (
-                    <div className="space-y-2">
-                      <div className="p-2 bg-muted rounded text-sm">
-                        <div className="flex items-center gap-2 mb-1">
-                          <ArrowRight className="h-3 w-3 text-red-500" />
-                          <span className="font-medium">矢印 #1</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground">腐食箇所を指示</p>
-                      </div>
-                      <div className="p-2 bg-muted rounded text-sm">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Circle className="h-3 w-3 text-blue-500" />
-                          <span className="font-medium">円 #1</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground">要交換箇所</p>
-                      </div>
-                    </div>
+                    <p className="text-sm text-muted-foreground">注釈があります</p>
                   ) : (
                     <p className="text-sm text-muted-foreground">注釈はありません</p>
                   )}
