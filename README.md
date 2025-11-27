@@ -92,7 +92,7 @@ CLERK_SECRET_KEY=sk_test_...
 - [x] Phase 1: 見積・原価管理 MVP
 - [x] Phase 2: 工程・契約・書類
 - [x] Phase 3: 写真・工事台帳
-- [ ] Phase 4: ダッシュボード・分析
+- [x] Phase 4: ダッシュボード・分析
 - [ ] Phase 5: 課金・サブスク基盤
 - [ ] Phase 6: HOUSE DNA 完全版
 - [ ] Phase 7: 施主ポータル
