@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useMemo } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Plus,
   Search,
   MoreHorizontal,
@@ -28,74 +36,14 @@ import {
   Trash,
   Send,
   Download,
+  Loader2,
 } from "lucide-react";
 import { ESTIMATE_STATUS } from "@/constants";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
-
-// デモデータ
-const estimates = [
-  {
-    id: "1",
-    estimateNumber: "EST-2024-001",
-    title: "キッチンリフォーム工事",
-    customerName: "山田太郎 様",
-    total: 1633857,
-    costTotal: 679000,
-    profitRate: 54.3,
-    status: "submitted",
-    estimateDate: new Date("2024-11-20"),
-    validUntil: new Date("2024-12-20"),
-  },
-  {
-    id: "2",
-    estimateNumber: "EST-2024-002",
-    title: "外壁塗装工事",
-    customerName: "佐藤建設 様",
-    total: 1250000,
-    costTotal: 875000,
-    profitRate: 30.0,
-    status: "ordered",
-    estimateDate: new Date("2024-11-15"),
-    validUntil: new Date("2024-12-15"),
-  },
-  {
-    id: "3",
-    estimateNumber: "EST-2024-003",
-    title: "浴室リフォーム工事",
-    customerName: "田中工務店 様",
-    total: 980000,
-    costTotal: 686000,
-    profitRate: 30.0,
-    status: "draft",
-    estimateDate: new Date("2024-11-25"),
-    validUntil: new Date("2024-12-25"),
-  },
-  {
-    id: "4",
-    estimateNumber: "EST-2024-004",
-    title: "屋根葺き替え工事",
-    customerName: "鈴木邸",
-    total: 2500000,
-    costTotal: 1750000,
-    profitRate: 30.0,
-    status: "lost",
-    estimateDate: new Date("2024-11-10"),
-    validUntil: new Date("2024-12-10"),
-  },
-  {
-    id: "5",
-    estimateNumber: "EST-2024-005",
-    title: "内装リノベーション",
-    customerName: "高橋商事 様",
-    total: 4500000,
-    costTotal: 3150000,
-    profitRate: 30.0,
-    status: "pending",
-    estimateDate: new Date("2024-11-22"),
-    validUntil: new Date("2024-12-22"),
-  },
-];
+import { useEstimates, useDeleteEstimate } from "@/hooks/use-estimates";
+import { useAppStore, DEMO_COMPANY_ID } from "@/stores/app-store";
+import type { Estimate } from "@/lib/api/types";
 
 const statusColors: Record<string, string> = {
   draft: "bg-gray-100 text-gray-800",
@@ -106,6 +54,56 @@ const statusColors: Record<string, string> = {
 };
 
 export default function EstimatesPage() {
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [page, setPage] = useState(1);
+
+  // ストアからcompanyIdを取得
+  const companyId = useAppStore((state) => state.companyId) || DEMO_COMPANY_ID;
+
+  // 見積一覧を取得
+  const { data, isLoading, isError } = useEstimates({
+    companyId,
+    search: search || undefined,
+    status: statusFilter !== "all" ? statusFilter : undefined,
+    page,
+    limit: 20,
+  });
+
+  const estimates = data?.data ?? [];
+  const pagination = data?.pagination;
+  const deleteEstimate = useDeleteEstimate();
+
+  // 統計情報の計算
+  const stats = useMemo(() => {
+    if (!estimates.length) {
+      return {
+        total: pagination?.total ?? 0,
+        totalAmount: 0,
+        orderRate: 0,
+        avgProfitRate: 0,
+      };
+    }
+    const totalAmount = estimates.reduce((sum, e) => sum + Number(e.total), 0);
+    const orderedCount = estimates.filter((e) => e.status === "ordered").length;
+    const orderRate = estimates.length > 0 ? (orderedCount / estimates.length) * 100 : 0;
+    const avgProfitRate = estimates.reduce((sum, e) => sum + Number(e.profitRate), 0) / estimates.length;
+    return {
+      total: pagination?.total ?? estimates.length,
+      totalAmount,
+      orderRate,
+      avgProfitRate,
+    };
+  }, [estimates, pagination]);
+
+  if (isError) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <p className="text-muted-foreground">データの取得に失敗しました</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -127,11 +125,15 @@ export default function EstimatesPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              今月の見積件数
+              見積件数
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12件</div>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            ) : (
+              <div className="text-2xl font-bold">{stats.total}件</div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -141,7 +143,13 @@ export default function EstimatesPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">¥24.5M</div>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            ) : (
+              <div className="text-2xl font-bold">
+                ¥{(stats.totalAmount / 1000000).toFixed(1)}M
+              </div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -151,7 +159,11 @@ export default function EstimatesPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">42%</div>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            ) : (
+              <div className="text-2xl font-bold">{stats.orderRate.toFixed(0)}%</div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -161,7 +173,11 @@ export default function EstimatesPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">32.5%</div>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            ) : (
+              <div className="text-2xl font-bold">{stats.avgProfitRate.toFixed(1)}%</div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -171,9 +187,38 @@ export default function EstimatesPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>見積一覧</CardTitle>
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input placeholder="検索..." className="pl-9" />
+            <div className="flex items-center gap-2">
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="検索..."
+                  className="pl-9"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
+                />
+              </div>
+              <Select
+                value={statusFilter}
+                onValueChange={(value) => {
+                  setStatusFilter(value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder="ステータス" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">すべて</SelectItem>
+                  {Object.entries(ESTIMATE_STATUS).map(([key, value]) => (
+                    <SelectItem key={key} value={key}>
+                      {value.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardHeader>
@@ -192,78 +237,104 @@ export default function EstimatesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {estimates.map((estimate) => (
-                <TableRow key={estimate.id}>
-                  <TableCell className="font-medium">
-                    <Link
-                      href={`/estimates/${estimate.id}`}
-                      className="hover:underline"
-                    >
-                      {estimate.estimateNumber}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{estimate.title}</TableCell>
-                  <TableCell>{estimate.customerName}</TableCell>
-                  <TableCell className="text-right">
-                    ¥{estimate.total.toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <span
-                      className={
-                        estimate.profitRate >= 30
-                          ? "text-green-600"
-                          : estimate.profitRate >= 20
-                          ? "text-yellow-600"
-                          : "text-red-600"
-                      }
-                    >
-                      {estimate.profitRate.toFixed(1)}%
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="secondary"
-                      className={statusColors[estimate.status]}
-                    >
-                      {ESTIMATE_STATUS[estimate.status as keyof typeof ESTIMATE_STATUS]?.label}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {format(estimate.estimateDate, "yyyy/MM/dd", { locale: ja })}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                          <FileText className="mr-2 h-4 w-4" />
-                          詳細を見る
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Copy className="mr-2 h-4 w-4" />
-                          コピーして作成
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Download className="mr-2 h-4 w-4" />
-                          PDFダウンロード
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Send className="mr-2 h-4 w-4" />
-                          メール送信
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-red-600">
-                          <Trash className="mr-2 h-4 w-4" />
-                          削除
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="h-32 text-center">
+                    <Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" />
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : estimates.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
+                    見積が見つかりませんでした
+                  </TableCell>
+                </TableRow>
+              ) : (
+                estimates.map((estimate) => {
+                  const profitRate = Number(estimate.profitRate);
+                  return (
+                    <TableRow key={estimate.id}>
+                      <TableCell className="font-medium">
+                        <Link
+                          href={`/estimates/${estimate.id}`}
+                          className="hover:underline"
+                        >
+                          {estimate.estimateNumber}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{estimate.title}</TableCell>
+                      <TableCell>{estimate.customer?.name ?? "-"}</TableCell>
+                      <TableCell className="text-right">
+                        ¥{Number(estimate.total).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span
+                          className={
+                            profitRate >= 30
+                              ? "text-green-600"
+                              : profitRate >= 20
+                              ? "text-yellow-600"
+                              : "text-red-600"
+                          }
+                        >
+                          {profitRate.toFixed(1)}%
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="secondary"
+                          className={statusColors[estimate.status]}
+                        >
+                          {ESTIMATE_STATUS[estimate.status as keyof typeof ESTIMATE_STATUS]?.label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {format(new Date(estimate.estimateDate), "yyyy/MM/dd", { locale: ja })}
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link href={`/estimates/${estimate.id}`}>
+                                <FileText className="mr-2 h-4 w-4" />
+                                詳細を見る
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Copy className="mr-2 h-4 w-4" />
+                              コピーして作成
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Download className="mr-2 h-4 w-4" />
+                              PDFダウンロード
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Send className="mr-2 h-4 w-4" />
+                              メール送信
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-red-600"
+                              onClick={() => {
+                                if (confirm("この見積を削除しますか？")) {
+                                  deleteEstimate.mutate(estimate.id);
+                                }
+                              }}
+                            >
+                              <Trash className="mr-2 h-4 w-4" />
+                              削除
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
             </TableBody>
           </Table>
         </CardContent>

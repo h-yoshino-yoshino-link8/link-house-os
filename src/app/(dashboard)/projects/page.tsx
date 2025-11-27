@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -54,142 +54,15 @@ import {
   Clock,
   CheckCircle2,
   CircleDot,
-  PauseCircle,
   Wallet,
+  Loader2,
 } from "lucide-react";
 import { PROJECT_STATUS } from "@/constants";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
-
-// デモデータ
-const projects = [
-  {
-    id: "1",
-    projectNumber: "PRJ-2024-001",
-    title: "山田邸 外壁塗装工事",
-    customerName: "山田太郎",
-    customerId: "1",
-    houseName: "山田邸",
-    houseId: "1",
-    status: "in_progress",
-    contractAmount: 1800000,
-    costBudget: 1200000,
-    costActual: 950000,
-    startDate: new Date("2024-10-01"),
-    endDate: new Date("2024-11-15"),
-    progress: 65,
-    assignee: "佐藤",
-    hasAlert: false,
-  },
-  {
-    id: "2",
-    projectNumber: "PRJ-2024-002",
-    title: "佐藤ビル 屋根修繕工事",
-    customerName: "佐藤建設株式会社",
-    customerId: "2",
-    houseName: "佐藤ビル",
-    houseId: "2",
-    status: "contracted",
-    contractAmount: 3500000,
-    costBudget: 2400000,
-    costActual: 0,
-    startDate: new Date("2024-11-20"),
-    endDate: new Date("2025-01-31"),
-    progress: 0,
-    assignee: "田中",
-    hasAlert: false,
-  },
-  {
-    id: "3",
-    projectNumber: "PRJ-2024-003",
-    title: "田中邸 浴室リフォーム",
-    customerName: "田中花子",
-    customerId: "3",
-    houseName: "田中邸",
-    houseId: "3",
-    status: "completed",
-    contractAmount: 1200000,
-    costBudget: 800000,
-    costActual: 780000,
-    startDate: new Date("2024-08-15"),
-    endDate: new Date("2024-09-30"),
-    progress: 100,
-    assignee: "山本",
-    hasAlert: false,
-  },
-  {
-    id: "4",
-    projectNumber: "PRJ-2024-004",
-    title: "鈴木邸 キッチン改修",
-    customerName: "鈴木一郎",
-    customerId: "4",
-    houseName: "鈴木邸",
-    houseId: "4",
-    status: "in_progress",
-    contractAmount: 2500000,
-    costBudget: 1700000,
-    costActual: 1850000,
-    startDate: new Date("2024-09-01"),
-    endDate: new Date("2024-11-10"),
-    progress: 85,
-    assignee: "佐藤",
-    hasAlert: true,
-  },
-  {
-    id: "5",
-    projectNumber: "PRJ-2024-005",
-    title: "高橋商事 オフィス内装",
-    customerName: "高橋商事株式会社",
-    customerId: "5",
-    houseName: "高橋商事ビル",
-    houseId: "5",
-    status: "invoiced",
-    contractAmount: 4800000,
-    costBudget: 3200000,
-    costActual: 3150000,
-    startDate: new Date("2024-06-01"),
-    endDate: new Date("2024-08-31"),
-    progress: 100,
-    assignee: "田中",
-    hasAlert: false,
-  },
-  {
-    id: "6",
-    projectNumber: "PRJ-2024-006",
-    title: "渡辺邸 外構工事",
-    customerName: "渡辺次郎",
-    customerId: "6",
-    houseName: "渡辺邸",
-    houseId: "6",
-    status: "planning",
-    contractAmount: 800000,
-    costBudget: 550000,
-    costActual: 0,
-    startDate: new Date("2024-12-01"),
-    endDate: new Date("2024-12-20"),
-    progress: 0,
-    assignee: "山本",
-    hasAlert: false,
-  },
-  {
-    id: "7",
-    projectNumber: "PRJ-2024-007",
-    title: "伊藤邸 全面リノベーション",
-    customerName: "伊藤三郎",
-    customerId: "7",
-    houseName: "伊藤邸",
-    houseId: "7",
-    status: "paid",
-    contractAmount: 12000000,
-    costBudget: 8500000,
-    costActual: 8200000,
-    startDate: new Date("2024-01-15"),
-    endDate: new Date("2024-05-30"),
-    progress: 100,
-    assignee: "佐藤",
-    hasAlert: false,
-  },
-];
+import { useProjects, useDeleteProject } from "@/hooks/use-projects";
+import { useAppStore, DEMO_COMPANY_ID } from "@/stores/app-store";
+import type { Project } from "@/lib/api/types";
 
 const statusIcons: Record<string, React.ReactNode> = {
   planning: <CircleDot className="h-4 w-4 text-gray-500" />,
@@ -213,30 +86,70 @@ export default function ProjectsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+
+  // ストアからcompanyIdを取得
+  const companyId = useAppStore((state) => state.companyId) || DEMO_COMPANY_ID;
+
+  // 案件一覧を取得
+  const { data, isLoading, isError } = useProjects({
+    companyId,
+    search: searchQuery || undefined,
+    status: statusFilter !== "all" ? statusFilter : undefined,
+    page,
+    limit: 20,
+  });
+
+  const projects = data?.data ?? [];
+  const pagination = data?.pagination;
+  const deleteProject = useDeleteProject();
 
   // 統計計算
-  const totalProjects = projects.length;
-  const inProgressCount = projects.filter((p) => p.status === "in_progress").length;
-  const totalContractAmount = projects.reduce((sum, p) => sum + p.contractAmount, 0);
-  const totalProfit = projects.reduce((sum, p) => {
-    if (p.costActual > 0) {
-      return sum + (p.contractAmount - p.costActual);
+  const stats = useMemo(() => {
+    if (!projects.length) {
+      return {
+        totalProjects: pagination?.total ?? 0,
+        inProgressCount: 0,
+        totalContractAmount: 0,
+        averageProfitRate: 0,
+        alertCount: 0,
+      };
     }
-    return sum + (p.contractAmount - p.costBudget);
-  }, 0);
-  const averageProfitRate = (totalProfit / totalContractAmount) * 100;
-  const alertCount = projects.filter((p) => p.hasAlert || p.costActual > p.costBudget).length;
 
-  // フィルター適用
-  const filteredProjects = projects.filter((project) => {
-    const matchesStatus = statusFilter === "all" || project.status === statusFilter;
-    const matchesSearch =
-      searchQuery === "" ||
-      project.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.projectNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.customerName.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesStatus && matchesSearch;
-  });
+    const inProgressCount = projects.filter((p) => p.status === "in_progress").length;
+    const totalContractAmount = projects.reduce((sum, p) => sum + Number(p.contractAmount ?? 0), 0);
+    const totalProfit = projects.reduce((sum, p) => {
+      const costActual = Number(p.costActual ?? 0);
+      const costBudget = Number(p.costBudget ?? 0);
+      const contractAmount = Number(p.contractAmount ?? 0);
+      if (costActual > 0) {
+        return sum + (contractAmount - costActual);
+      }
+      return sum + (contractAmount - costBudget);
+    }, 0);
+    const averageProfitRate = totalContractAmount > 0 ? (totalProfit / totalContractAmount) * 100 : 0;
+    const alertCount = projects.filter((p) => {
+      const costActual = Number(p.costActual ?? 0);
+      const costBudget = Number(p.costBudget ?? 0);
+      return costActual > costBudget && costBudget > 0;
+    }).length;
+
+    return {
+      totalProjects: pagination?.total ?? projects.length,
+      inProgressCount,
+      totalContractAmount,
+      averageProfitRate,
+      alertCount,
+    };
+  }, [projects, pagination]);
+
+  if (isError) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <p className="text-muted-foreground">データの取得に失敗しました</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -355,10 +268,16 @@ export default function ProjectsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalProjects}件</div>
-            <p className="text-xs text-muted-foreground">
-              施工中: {inProgressCount}件
-            </p>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{stats.totalProjects}件</div>
+                <p className="text-xs text-muted-foreground">
+                  施工中: {stats.inProgressCount}件
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -371,10 +290,16 @@ export default function ProjectsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              ¥{(totalContractAmount / 10000).toLocaleString()}万
-            </div>
-            <p className="text-xs text-muted-foreground">今年度累計</p>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">
+                  ¥{(stats.totalContractAmount / 10000).toLocaleString()}万
+                </div>
+                <p className="text-xs text-muted-foreground">今年度累計</p>
+              </>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -387,10 +312,16 @@ export default function ProjectsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {averageProfitRate.toFixed(1)}%
-            </div>
-            <p className="text-xs text-muted-foreground">目標: 30%</p>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold text-green-600">
+                  {stats.averageProfitRate.toFixed(1)}%
+                </div>
+                <p className="text-xs text-muted-foreground">目標: 30%</p>
+              </>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -403,10 +334,16 @@ export default function ProjectsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${alertCount > 0 ? "text-red-600" : "text-green-600"}`}>
-              {alertCount}件
-            </div>
-            <p className="text-xs text-muted-foreground">原価超過・遅延</p>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            ) : (
+              <>
+                <div className={`text-2xl font-bold ${stats.alertCount > 0 ? "text-red-600" : "text-green-600"}`}>
+                  {stats.alertCount}件
+                </div>
+                <p className="text-xs text-muted-foreground">原価超過・遅延</p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -458,127 +395,156 @@ export default function ProjectsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredProjects.map((project) => {
-                const profitRate =
-                  project.costActual > 0
-                    ? ((project.contractAmount - project.costActual) / project.contractAmount) * 100
-                    : ((project.contractAmount - project.costBudget) / project.contractAmount) * 100;
-                const isOverBudget = project.costActual > project.costBudget && project.costBudget > 0;
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="h-32 text-center">
+                    <Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" />
+                  </TableCell>
+                </TableRow>
+              ) : projects.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
+                    案件が見つかりませんでした
+                  </TableCell>
+                </TableRow>
+              ) : (
+                projects.map((project) => {
+                  const costActual = Number(project.costActual ?? 0);
+                  const costBudget = Number(project.costBudget ?? 0);
+                  const contractAmount = Number(project.contractAmount ?? 0);
+                  const profitRate = contractAmount > 0
+                    ? costActual > 0
+                      ? ((contractAmount - costActual) / contractAmount) * 100
+                      : ((contractAmount - costBudget) / contractAmount) * 100
+                    : 0;
+                  const isOverBudget = costActual > costBudget && costBudget > 0;
 
-                return (
-                  <TableRow key={project.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {(project.hasAlert || isOverBudget) && (
-                          <AlertTriangle className="h-4 w-4 text-red-500" />
-                        )}
-                        <div>
-                          <Link
-                            href={`/projects/${project.id}`}
-                            className="font-medium hover:underline"
-                          >
-                            {project.title}
-                          </Link>
-                          <p className="text-xs text-muted-foreground">
-                            {project.projectNumber}
-                          </p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Link
-                        href={`/customers/${project.customerId}`}
-                        className="text-sm hover:underline"
-                      >
-                        {project.customerName}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={statusColors[project.status]}>
-                        <span className="flex items-center gap-1">
-                          {statusIcons[project.status]}
-                          {PROJECT_STATUS[project.status as keyof typeof PROJECT_STATUS]?.label}
-                        </span>
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3 text-muted-foreground" />
-                          {format(project.startDate, "M/d", { locale: ja })} - {format(project.endDate, "M/d", { locale: ja })}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="w-24">
-                        <div className="flex items-center justify-between text-xs mb-1">
-                          <span>{project.progress}%</span>
-                        </div>
-                        <Progress value={project.progress} className="h-2" />
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      ¥{project.contractAmount.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="text-sm">
-                        <span className={isOverBudget ? "text-red-600 font-medium" : ""}>
-                          ¥{project.costActual > 0 ? project.costActual.toLocaleString() : "-"}
-                        </span>
-                        <span className="text-muted-foreground"> / </span>
-                        <span className="text-muted-foreground">
-                          ¥{project.costBudget.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className={`text-xs ${profitRate >= 30 ? "text-green-600" : profitRate >= 20 ? "text-yellow-600" : "text-red-600"}`}>
-                        粗利率: {profitRate.toFixed(1)}%
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <User className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-sm">{project.assignee}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link href={`/projects/${project.id}`}>詳細を見る</Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>編集</DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem asChild>
-                            <Link href={`/schedules?project=${project.id}`}>
-                              <Calendar className="mr-2 h-4 w-4" />
-                              工程表
+                  return (
+                    <TableRow key={project.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {isOverBudget && (
+                            <AlertTriangle className="h-4 w-4 text-red-500" />
+                          )}
+                          <div>
+                            <Link
+                              href={`/projects/${project.id}`}
+                              className="font-medium hover:underline"
+                            >
+                              {project.title}
                             </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <Link href={`/photos?project=${project.id}`}>
-                              <Camera className="mr-2 h-4 w-4" />
-                              写真管理
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <FileText className="mr-2 h-4 w-4" />
-                            書類作成
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-red-600">
-                            削除
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+                            <p className="text-xs text-muted-foreground">
+                              {project.projectNumber}
+                            </p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Link
+                          href={`/customers/${project.customerId}`}
+                          className="text-sm hover:underline"
+                        >
+                          {project.customer?.name ?? "-"}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={statusColors[project.status]}>
+                          <span className="flex items-center gap-1">
+                            {statusIcons[project.status]}
+                            {PROJECT_STATUS[project.status as keyof typeof PROJECT_STATUS]?.label}
+                          </span>
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          {project.startDate && project.endDate ? (
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3 text-muted-foreground" />
+                              {format(new Date(project.startDate), "M/d", { locale: ja })} - {format(new Date(project.endDate), "M/d", { locale: ja })}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">未定</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="w-24">
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span>0%</span>
+                          </div>
+                          <Progress value={0} className="h-2" />
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        ¥{contractAmount.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="text-sm">
+                          <span className={isOverBudget ? "text-red-600 font-medium" : ""}>
+                            ¥{costActual > 0 ? costActual.toLocaleString() : "-"}
+                          </span>
+                          <span className="text-muted-foreground"> / </span>
+                          <span className="text-muted-foreground">
+                            ¥{costBudget.toLocaleString()}
+                          </span>
+                        </div>
+                        <div className={`text-xs ${profitRate >= 30 ? "text-green-600" : profitRate >= 20 ? "text-yellow-600" : "text-red-600"}`}>
+                          粗利率: {profitRate.toFixed(1)}%
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <User className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-sm">-</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link href={`/projects/${project.id}`}>詳細を見る</Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>編集</DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem asChild>
+                              <Link href={`/schedules?project=${project.id}`}>
+                                <Calendar className="mr-2 h-4 w-4" />
+                                工程表
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                              <Link href={`/photos?project=${project.id}`}>
+                                <Camera className="mr-2 h-4 w-4" />
+                                写真管理
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <FileText className="mr-2 h-4 w-4" />
+                              書類作成
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-red-600"
+                              onClick={() => {
+                                if (confirm("この案件を削除しますか？")) {
+                                  deleteProject.mutate(project.id);
+                                }
+                              }}
+                            >
+                              削除
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
             </TableBody>
           </Table>
         </CardContent>
