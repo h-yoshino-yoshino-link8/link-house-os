@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -27,74 +26,39 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
-  Calendar,
   Download,
   Share2,
   Filter,
+  Loader2,
 } from "lucide-react";
-import { format, addDays, startOfWeek, eachDayOfInterval, isSameDay, isWithinInterval, differenceInDays } from "date-fns";
+import { format, addDays, startOfWeek, eachDayOfInterval, isSameDay, differenceInDays } from "date-fns";
 import { ja } from "date-fns/locale";
-
-// デモデータ
-const projects = [
-  {
-    id: "1",
-    name: "山田邸 キッチンリフォーム",
-    customer: "山田太郎 様",
-    status: "in_progress",
-    startDate: new Date("2024-11-25"),
-    endDate: new Date("2024-12-10"),
-    progress: 35,
-    schedules: [
-      { id: "1-1", name: "解体工事", startDate: new Date("2024-11-25"), endDate: new Date("2024-11-27"), progress: 100, color: "#ef4444", assignee: "田中" },
-      { id: "1-2", name: "設備配管", startDate: new Date("2024-11-27"), endDate: new Date("2024-11-29"), progress: 80, color: "#3b82f6", assignee: "山本" },
-      { id: "1-3", name: "電気工事", startDate: new Date("2024-11-28"), endDate: new Date("2024-11-30"), progress: 50, color: "#eab308", assignee: "佐々木" },
-      { id: "1-4", name: "キッチン設置", startDate: new Date("2024-12-02"), endDate: new Date("2024-12-05"), progress: 0, color: "#22c55e", assignee: "鈴木" },
-      { id: "1-5", name: "内装仕上げ", startDate: new Date("2024-12-05"), endDate: new Date("2024-12-09"), progress: 0, color: "#a855f7", assignee: "高橋" },
-      { id: "1-6", name: "検査・引渡し", startDate: new Date("2024-12-09"), endDate: new Date("2024-12-10"), progress: 0, color: "#64748b", assignee: "担当" },
-    ],
-  },
-  {
-    id: "2",
-    name: "佐藤邸 外壁塗装",
-    customer: "佐藤建設 様",
-    status: "in_progress",
-    startDate: new Date("2024-11-20"),
-    endDate: new Date("2024-12-05"),
-    progress: 60,
-    schedules: [
-      { id: "2-1", name: "足場設置", startDate: new Date("2024-11-20"), endDate: new Date("2024-11-22"), progress: 100, color: "#f97316", assignee: "ABC塗装" },
-      { id: "2-2", name: "高圧洗浄", startDate: new Date("2024-11-22"), endDate: new Date("2024-11-23"), progress: 100, color: "#06b6d4", assignee: "ABC塗装" },
-      { id: "2-3", name: "下地補修", startDate: new Date("2024-11-25"), endDate: new Date("2024-11-27"), progress: 100, color: "#84cc16", assignee: "ABC塗装" },
-      { id: "2-4", name: "下塗り", startDate: new Date("2024-11-27"), endDate: new Date("2024-11-28"), progress: 100, color: "#8b5cf6", assignee: "ABC塗装" },
-      { id: "2-5", name: "中塗り", startDate: new Date("2024-11-28"), endDate: new Date("2024-11-30"), progress: 50, color: "#ec4899", assignee: "ABC塗装" },
-      { id: "2-6", name: "上塗り", startDate: new Date("2024-12-02"), endDate: new Date("2024-12-03"), progress: 0, color: "#14b8a6", assignee: "ABC塗装" },
-      { id: "2-7", name: "足場解体", startDate: new Date("2024-12-04"), endDate: new Date("2024-12-05"), progress: 0, color: "#f97316", assignee: "ABC塗装" },
-    ],
-  },
-  {
-    id: "3",
-    name: "田中邸 浴室リフォーム",
-    customer: "田中花子 様",
-    status: "planning",
-    startDate: new Date("2024-12-10"),
-    endDate: new Date("2024-12-20"),
-    progress: 0,
-    schedules: [
-      { id: "3-1", name: "解体・搬出", startDate: new Date("2024-12-10"), endDate: new Date("2024-12-11"), progress: 0, color: "#ef4444", assignee: "未定" },
-      { id: "3-2", name: "配管工事", startDate: new Date("2024-12-12"), endDate: new Date("2024-12-13"), progress: 0, color: "#3b82f6", assignee: "未定" },
-      { id: "3-3", name: "電気工事", startDate: new Date("2024-12-12"), endDate: new Date("2024-12-13"), progress: 0, color: "#eab308", assignee: "未定" },
-      { id: "3-4", name: "ユニットバス設置", startDate: new Date("2024-12-14"), endDate: new Date("2024-12-17"), progress: 0, color: "#22c55e", assignee: "未定" },
-      { id: "3-5", name: "内装仕上げ", startDate: new Date("2024-12-18"), endDate: new Date("2024-12-19"), progress: 0, color: "#a855f7", assignee: "未定" },
-      { id: "3-6", name: "検査・引渡し", startDate: new Date("2024-12-20"), endDate: new Date("2024-12-20"), progress: 0, color: "#64748b", assignee: "担当" },
-    ],
-  },
-];
+import { useSchedules, useCreateSchedule } from "@/hooks/use-schedules";
+import { useAppStore, DEMO_COMPANY_ID } from "@/stores/app-store";
+import { toast } from "sonner";
 
 export default function SchedulesPage() {
-  const [currentDate, setCurrentDate] = useState(new Date("2024-11-25"));
+  const companyId = useAppStore((state) => state.companyId) || DEMO_COMPANY_ID;
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedProject, setSelectedProject] = useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  // フォーム状態
+  const [newSchedule, setNewSchedule] = useState({
+    projectId: "",
+    name: "",
+    startDate: "",
+    endDate: "",
+    assignee: "",
+    color: "#3b82f6",
+  });
+
+  // API からデータ取得
+  const { data, isLoading, isError } = useSchedules({
+    companyId,
+  });
+  const projects = data?.data ?? [];
+  const createSchedule = useCreateSchedule();
 
   // 表示する日付範囲（3週間）
   const startOfView = startOfWeek(currentDate, { weekStartsOn: 1 });
@@ -107,10 +71,10 @@ export default function SchedulesPage() {
     ? projects
     : projects.filter(p => p.id === selectedProject);
 
-  const getBarPosition = (scheduleStart: Date, scheduleEnd: Date) => {
-    const dayWidth = 100 / 21; // 21日分の幅
-    const startDiff = differenceInDays(scheduleStart, startOfView);
-    const duration = differenceInDays(scheduleEnd, scheduleStart) + 1;
+  const getBarPosition = (scheduleStart: string, scheduleEnd: string) => {
+    const dayWidth = 100 / 21;
+    const startDiff = differenceInDays(new Date(scheduleStart), startOfView);
+    const duration = differenceInDays(new Date(scheduleEnd), new Date(scheduleStart)) + 1;
 
     const left = Math.max(0, startDiff * dayWidth);
     const width = Math.min(duration * dayWidth, (21 - Math.max(0, startDiff)) * dayWidth);
@@ -119,6 +83,44 @@ export default function SchedulesPage() {
   };
 
   const isToday = (date: Date) => isSameDay(date, new Date());
+
+  const handleCreateSchedule = async () => {
+    if (!newSchedule.projectId || !newSchedule.name || !newSchedule.startDate || !newSchedule.endDate) {
+      toast.error("必須項目を入力してください");
+      return;
+    }
+
+    try {
+      await createSchedule.mutateAsync({
+        projectId: newSchedule.projectId,
+        name: newSchedule.name,
+        startDate: newSchedule.startDate,
+        endDate: newSchedule.endDate,
+        assignee: newSchedule.assignee || undefined,
+        color: newSchedule.color,
+      });
+      toast.success("工程を追加しました");
+      setIsDialogOpen(false);
+      setNewSchedule({
+        projectId: "",
+        name: "",
+        startDate: "",
+        endDate: "",
+        assignee: "",
+        color: "#3b82f6",
+      });
+    } catch {
+      toast.error("工程の追加に失敗しました");
+    }
+  };
+
+  if (isError) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <p className="text-muted-foreground">データの取得に失敗しました</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -153,8 +155,11 @@ export default function SchedulesPage() {
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="space-y-2">
-                  <Label>案件</Label>
-                  <Select>
+                  <Label>案件 *</Label>
+                  <Select
+                    value={newSchedule.projectId}
+                    onValueChange={(value) => setNewSchedule({ ...newSchedule, projectId: value })}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="案件を選択" />
                     </SelectTrigger>
@@ -166,29 +171,60 @@ export default function SchedulesPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>工程名</Label>
-                  <Input placeholder="例：解体工事" />
+                  <Label>工程名 *</Label>
+                  <Input
+                    placeholder="例：解体工事"
+                    value={newSchedule.name}
+                    onChange={(e) => setNewSchedule({ ...newSchedule, name: e.target.value })}
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>開始日</Label>
-                    <Input type="date" />
+                    <Label>開始日 *</Label>
+                    <Input
+                      type="date"
+                      value={newSchedule.startDate}
+                      onChange={(e) => setNewSchedule({ ...newSchedule, startDate: e.target.value })}
+                    />
                   </div>
                   <div className="space-y-2">
-                    <Label>終了日</Label>
-                    <Input type="date" />
+                    <Label>終了日 *</Label>
+                    <Input
+                      type="date"
+                      value={newSchedule.endDate}
+                      onChange={(e) => setNewSchedule({ ...newSchedule, endDate: e.target.value })}
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label>担当者</Label>
-                  <Input placeholder="担当者名" />
+                  <Input
+                    placeholder="担当者名"
+                    value={newSchedule.assignee}
+                    onChange={(e) => setNewSchedule({ ...newSchedule, assignee: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>色</Label>
+                  <div className="flex gap-2">
+                    {["#ef4444", "#3b82f6", "#eab308", "#22c55e", "#a855f7", "#64748b", "#f97316", "#06b6d4"].map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        className={`h-8 w-8 rounded-full border-2 ${newSchedule.color === color ? "border-primary" : "border-transparent"}`}
+                        style={{ backgroundColor: color }}
+                        onClick={() => setNewSchedule({ ...newSchedule, color })}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                   キャンセル
                 </Button>
-                <Button onClick={() => setIsDialogOpen(false)}>
+                <Button onClick={handleCreateSchedule} disabled={createSchedule.isPending}>
+                  {createSchedule.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   追加
                 </Button>
               </DialogFooter>
@@ -243,123 +279,133 @@ export default function SchedulesPage() {
       {/* Gantt Chart */}
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <div className="min-w-[1200px]">
-              {/* Header - Days */}
-              <div className="flex border-b">
-                <div className="w-64 flex-shrink-0 border-r p-3 font-medium bg-muted/50">
-                  案件 / 工程
-                </div>
-                <div className="flex-1 flex">
-                  {days.map((day, index) => (
-                    <div
-                      key={index}
-                      className={`flex-1 text-center p-2 text-xs border-r last:border-r-0 ${
-                        isToday(day) ? "bg-primary/10 font-bold" : ""
-                      } ${day.getDay() === 0 ? "bg-red-50 dark:bg-red-950/20" : ""} ${day.getDay() === 6 ? "bg-blue-50 dark:bg-blue-950/20" : ""}`}
-                    >
-                      <div className="text-muted-foreground">
-                        {format(day, "E", { locale: ja })}
-                      </div>
-                      <div className={isToday(day) ? "text-primary" : ""}>
-                        {format(day, "d")}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Projects and Schedules */}
-              {filteredProjects.map((project) => (
-                <div key={project.id}>
-                  {/* Project Row */}
-                  <div className="flex border-b bg-muted/30">
-                    <div className="w-64 flex-shrink-0 border-r p-3">
-                      <div className="font-medium">{project.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {project.customer}
-                      </div>
-                      <div className="mt-1 flex items-center gap-2">
-                        <Progress value={project.progress} className="h-1.5 flex-1" />
-                        <span className="text-xs text-muted-foreground">
-                          {project.progress}%
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex-1 relative">
-                      {/* Project Bar Background */}
-                      <div className="absolute inset-0 flex">
-                        {days.map((day, index) => (
-                          <div
-                            key={index}
-                            className={`flex-1 border-r last:border-r-0 ${
-                              isToday(day) ? "bg-primary/5" : ""
-                            } ${day.getDay() === 0 ? "bg-red-50/50 dark:bg-red-950/10" : ""} ${day.getDay() === 6 ? "bg-blue-50/50 dark:bg-blue-950/10" : ""}`}
-                          />
-                        ))}
-                      </div>
-                    </div>
+          {isLoading ? (
+            <div className="flex h-64 items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : filteredProjects.length === 0 ? (
+            <div className="flex h-64 items-center justify-center text-muted-foreground">
+              工程が登録されたプロジェクトがありません
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <div className="min-w-[1200px]">
+                {/* Header - Days */}
+                <div className="flex border-b">
+                  <div className="w-64 flex-shrink-0 border-r p-3 font-medium bg-muted/50">
+                    案件 / 工程
                   </div>
-
-                  {/* Schedule Rows */}
-                  {project.schedules.map((schedule) => {
-                    const position = getBarPosition(schedule.startDate, schedule.endDate);
-                    return (
-                      <div key={schedule.id} className="flex border-b hover:bg-muted/20">
-                        <div className="w-64 flex-shrink-0 border-r p-2 pl-6">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="h-3 w-3 rounded-full"
-                              style={{ backgroundColor: schedule.color }}
-                            />
-                            <span className="text-sm">{schedule.name}</span>
-                          </div>
-                          <div className="text-xs text-muted-foreground ml-5">
-                            {schedule.assignee}
-                          </div>
+                  <div className="flex-1 flex">
+                    {days.map((day, index) => (
+                      <div
+                        key={index}
+                        className={`flex-1 text-center p-2 text-xs border-r last:border-r-0 ${
+                          isToday(day) ? "bg-primary/10 font-bold" : ""
+                        } ${day.getDay() === 0 ? "bg-red-50 dark:bg-red-950/20" : ""} ${day.getDay() === 6 ? "bg-blue-50 dark:bg-blue-950/20" : ""}`}
+                      >
+                        <div className="text-muted-foreground">
+                          {format(day, "E", { locale: ja })}
                         </div>
-                        <div className="flex-1 relative h-14">
-                          {/* Day columns */}
-                          <div className="absolute inset-0 flex">
-                            {days.map((day, index) => (
+                        <div className={isToday(day) ? "text-primary" : ""}>
+                          {format(day, "d")}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Projects and Schedules */}
+                {filteredProjects.map((project) => (
+                  <div key={project.id}>
+                    {/* Project Row */}
+                    <div className="flex border-b bg-muted/30">
+                      <div className="w-64 flex-shrink-0 border-r p-3">
+                        <div className="font-medium">{project.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {project.customer}
+                        </div>
+                        <div className="mt-1 flex items-center gap-2">
+                          <Progress value={project.progress} className="h-1.5 flex-1" />
+                          <span className="text-xs text-muted-foreground">
+                            {project.progress}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex-1 relative">
+                        {/* Project Bar Background */}
+                        <div className="absolute inset-0 flex">
+                          {days.map((day, index) => (
+                            <div
+                              key={index}
+                              className={`flex-1 border-r last:border-r-0 ${
+                                isToday(day) ? "bg-primary/5" : ""
+                              } ${day.getDay() === 0 ? "bg-red-50/50 dark:bg-red-950/10" : ""} ${day.getDay() === 6 ? "bg-blue-50/50 dark:bg-blue-950/10" : ""}`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Schedule Rows */}
+                    {project.schedules.map((schedule) => {
+                      const position = getBarPosition(schedule.startDate, schedule.endDate);
+                      return (
+                        <div key={schedule.id} className="flex border-b hover:bg-muted/20">
+                          <div className="w-64 flex-shrink-0 border-r p-2 pl-6">
+                            <div className="flex items-center gap-2">
                               <div
-                                key={index}
-                                className={`flex-1 border-r last:border-r-0 ${
-                                  isToday(day) ? "bg-primary/5" : ""
-                                } ${day.getDay() === 0 ? "bg-red-50/50 dark:bg-red-950/10" : ""} ${day.getDay() === 6 ? "bg-blue-50/50 dark:bg-blue-950/10" : ""}`}
+                                className="h-3 w-3 rounded-full"
+                                style={{ backgroundColor: schedule.color || "#3b82f6" }}
                               />
-                            ))}
+                              <span className="text-sm">{schedule.name}</span>
+                            </div>
+                            <div className="text-xs text-muted-foreground ml-5">
+                              {schedule.assignee || "-"}
+                            </div>
                           </div>
-                          {/* Schedule Bar */}
-                          <div
-                            className="absolute top-2 h-10 rounded-md flex items-center px-2 text-white text-xs font-medium shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
-                            style={{
-                              left: position.left,
-                              width: position.width,
-                              backgroundColor: schedule.color,
-                            }}
-                          >
-                            <div className="truncate">
-                              {schedule.progress > 0 && (
-                                <span className="mr-1">{schedule.progress}%</span>
+                          <div className="flex-1 relative h-14">
+                            {/* Day columns */}
+                            <div className="absolute inset-0 flex">
+                              {days.map((day, index) => (
+                                <div
+                                  key={index}
+                                  className={`flex-1 border-r last:border-r-0 ${
+                                    isToday(day) ? "bg-primary/5" : ""
+                                  } ${day.getDay() === 0 ? "bg-red-50/50 dark:bg-red-950/10" : ""} ${day.getDay() === 6 ? "bg-blue-50/50 dark:bg-blue-950/10" : ""}`}
+                                />
+                              ))}
+                            </div>
+                            {/* Schedule Bar */}
+                            <div
+                              className="absolute top-2 h-10 rounded-md flex items-center px-2 text-white text-xs font-medium shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
+                              style={{
+                                left: position.left,
+                                width: position.width,
+                                backgroundColor: schedule.color || "#3b82f6",
+                              }}
+                            >
+                              <div className="truncate">
+                                {schedule.progress > 0 && (
+                                  <span className="mr-1">{schedule.progress}%</span>
+                                )}
+                              </div>
+                              {/* Progress overlay */}
+                              {schedule.progress > 0 && schedule.progress < 100 && (
+                                <div
+                                  className="absolute inset-0 bg-black/20 rounded-md"
+                                  style={{ left: `${schedule.progress}%` }}
+                                />
                               )}
                             </div>
-                            {/* Progress overlay */}
-                            {schedule.progress > 0 && schedule.progress < 100 && (
-                              <div
-                                className="absolute inset-0 bg-black/20 rounded-md"
-                                style={{ left: `${schedule.progress}%` }}
-                              />
-                            )}
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEstimateStore } from "@/stores/estimate-store";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,15 +28,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
   ArrowLeft,
   Plus,
   Trash,
@@ -43,12 +35,16 @@ import {
   FileDown,
   Send,
   Calculator,
-  ChevronDown,
-  ChevronRight,
   GripVertical,
   Lightbulb,
+  Loader2,
 } from "lucide-react";
 import { UNITS } from "@/constants";
+import { useCustomers } from "@/hooks/use-customers";
+import { useHouses } from "@/hooks/use-houses";
+import { useCreateEstimate } from "@/hooks/use-estimates";
+import { useAppStore, DEMO_COMPANY_ID } from "@/stores/app-store";
+import { toast } from "sonner";
 
 // 見積明細の行コンポーネント
 function EstimateDetailRow({
@@ -166,8 +162,51 @@ function EstimateDetailRow({
 }
 
 export default function NewEstimatePage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const store = useEstimateStore();
-  const [showSimulator, setShowSimulator] = useState(false);
+  const companyId = useAppStore((state) => state.companyId) || DEMO_COMPANY_ID;
+
+  // URL パラメータから初期値を設定
+  const initialCustomerId = searchParams.get("customer") || searchParams.get("customerId");
+
+  // 顧客・物件一覧を取得
+  const { data: customersData, isLoading: isLoadingCustomers } = useCustomers({
+    companyId,
+    limit: 100,
+  });
+  const customers = customersData?.data ?? [];
+
+  // 選択された顧客のIDで物件をフィルタ
+  const { data: housesData, isLoading: isLoadingHouses } = useHouses({
+    companyId,
+    customerId: store.customerId || undefined,
+    limit: 100,
+    enabled: !!store.customerId,
+  });
+  const houses = housesData?.data ?? [];
+
+  // 見積作成ミューテーション
+  const createEstimate = useCreateEstimate();
+
+  // フォーム状態
+  const [estimateDate, setEstimateDate] = useState(new Date().toISOString().split("T")[0]);
+  const [validUntil, setValidUntil] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  // 初期化時にURLパラメータから顧客を設定
+  useEffect(() => {
+    if (initialCustomerId && !store.customerId) {
+      store.setCustomerId(initialCustomerId);
+    }
+  }, [initialCustomerId, store]);
+
+  // コンポーネントマウント時にストアをリセット
+  useEffect(() => {
+    return () => {
+      // ページ離脱時はリセットしない（保存していない変更を保持）
+    };
+  }, []);
 
   // デフォルトの明細を追加
   const addDefaultDetail = () => {
@@ -179,6 +218,106 @@ export default function NewEstimatePage() {
       costLabor: 0,
       profitRate: store.globalProfitRate,
     });
+  };
+
+  // 下書き保存
+  const handleSaveDraft = async () => {
+    if (!store.customerId) {
+      toast.error("顧客を選択してください");
+      return;
+    }
+    if (!store.title) {
+      toast.error("件名を入力してください");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const result = await createEstimate.mutateAsync({
+        companyId,
+        customerId: store.customerId,
+        houseId: store.houseId || undefined,
+        title: store.title,
+        status: "draft",
+        estimateDate: new Date(estimateDate).toISOString(),
+        validUntil: validUntil ? new Date(validUntil).toISOString() : undefined,
+        taxRate: store.taxRate,
+        notes: store.notes || undefined,
+        internalMemo: store.internalMemo || undefined,
+        details: store.details.map((d, i) => ({
+          sortOrder: i,
+          name: d.name,
+          specification: d.specification || undefined,
+          quantity: d.quantity,
+          unit: d.unit,
+          costMaterial: d.costMaterial,
+          costLabor: d.costLabor,
+          profitRate: d.profitRate,
+          internalMemo: d.internalMemo || undefined,
+        })),
+      });
+
+      toast.success("下書きを保存しました");
+      store.reset();
+      router.push(`/estimates/${result.data.id}`);
+    } catch (error) {
+      toast.error("保存に失敗しました");
+      console.error(error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // 見積確定
+  const handleSubmit = async () => {
+    if (!store.customerId) {
+      toast.error("顧客を選択してください");
+      return;
+    }
+    if (!store.title) {
+      toast.error("件名を入力してください");
+      return;
+    }
+    if (store.details.length === 0) {
+      toast.error("明細を追加してください");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const result = await createEstimate.mutateAsync({
+        companyId,
+        customerId: store.customerId,
+        houseId: store.houseId || undefined,
+        title: store.title,
+        status: "submitted",
+        estimateDate: new Date(estimateDate).toISOString(),
+        validUntil: validUntil ? new Date(validUntil).toISOString() : undefined,
+        taxRate: store.taxRate,
+        notes: store.notes || undefined,
+        internalMemo: store.internalMemo || undefined,
+        details: store.details.map((d, i) => ({
+          sortOrder: i,
+          name: d.name,
+          specification: d.specification || undefined,
+          quantity: d.quantity,
+          unit: d.unit,
+          costMaterial: d.costMaterial,
+          costLabor: d.costLabor,
+          profitRate: d.profitRate,
+          internalMemo: d.internalMemo || undefined,
+        })),
+      });
+
+      toast.success("見積を確定しました");
+      store.reset();
+      router.push(`/estimates/${result.data.id}`);
+    } catch (error) {
+      toast.error("保存に失敗しました");
+      console.error(error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -197,16 +336,24 @@ export default function NewEstimatePage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline">
-            <Save className="mr-2 h-4 w-4" />
+          <Button variant="outline" onClick={handleSaveDraft} disabled={isSaving}>
+            {isSaving ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="mr-2 h-4 w-4" />
+            )}
             下書き保存
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" disabled>
             <FileDown className="mr-2 h-4 w-4" />
             PDF出力
           </Button>
-          <Button>
-            <Send className="mr-2 h-4 w-4" />
+          <Button onClick={handleSubmit} disabled={isSaving}>
+            {isSaving ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="mr-2 h-4 w-4" />
+            )}
             見積確定
           </Button>
         </div>
@@ -221,32 +368,56 @@ export default function NewEstimatePage() {
           <CardContent className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label>顧客</Label>
-                <Select>
+                <Label>顧客 *</Label>
+                <Select
+                  value={store.customerId || ""}
+                  onValueChange={(value) => {
+                    store.setCustomerId(value);
+                    store.setHouseId(null); // 顧客変更時は物件をリセット
+                  }}
+                >
                   <SelectTrigger>
-                    <SelectValue placeholder="顧客を選択" />
+                    <SelectValue placeholder={isLoadingCustomers ? "読み込み中..." : "顧客を選択"} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="1">山田太郎 様</SelectItem>
-                    <SelectItem value="2">佐藤建設 様</SelectItem>
-                    <SelectItem value="3">田中工務店 様</SelectItem>
+                    {customers.map((customer) => (
+                      <SelectItem key={customer.id} value={customer.id}>
+                        {customer.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label>物件</Label>
-                <Select>
+                <Select
+                  value={store.houseId || ""}
+                  onValueChange={(value) => store.setHouseId(value)}
+                  disabled={!store.customerId}
+                >
                   <SelectTrigger>
-                    <SelectValue placeholder="物件を選択" />
+                    <SelectValue placeholder={
+                      !store.customerId
+                        ? "顧客を先に選択"
+                        : isLoadingHouses
+                        ? "読み込み中..."
+                        : houses.length === 0
+                        ? "物件なし"
+                        : "物件を選択"
+                    } />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="1">東京都○○区...</SelectItem>
+                    {houses.map((house) => (
+                      <SelectItem key={house.id} value={house.id}>
+                        {house.address}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <div className="space-y-2">
-              <Label>件名</Label>
+              <Label>件名 *</Label>
               <Input
                 value={store.title}
                 onChange={(e) => store.setTitle(e.target.value)}
@@ -256,11 +427,19 @@ export default function NewEstimatePage() {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>見積日</Label>
-                <Input type="date" defaultValue={new Date().toISOString().split("T")[0]} />
+                <Input
+                  type="date"
+                  value={estimateDate}
+                  onChange={(e) => setEstimateDate(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <Label>有効期限</Label>
-                <Input type="date" />
+                <Input
+                  type="date"
+                  value={validUntil}
+                  onChange={(e) => setValidUntil(e.target.value)}
+                />
               </div>
             </div>
           </CardContent>
@@ -341,10 +520,10 @@ export default function NewEstimatePage() {
           <div className="flex items-center justify-between">
             <CardTitle>見積明細</CardTitle>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" disabled>
                 マスタから追加
               </Button>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" disabled>
                 過去見積からコピー
               </Button>
               <Button size="sm" onClick={addDefaultDetail}>

@@ -43,6 +43,22 @@ export interface CustomerDetail extends Customer {
   projects: ProjectSummary[];
   savingsContracts: SavingsContractSummary[];
   pointTransactions: PointTransaction[];
+  referrals?: CustomerReferral[];
+  _count?: {
+    estimates: number;
+    projects: number;
+    houses: number;
+    referrals?: number;
+  };
+}
+
+export interface CustomerReferral {
+  id: string;
+  name: string;
+  status: string;
+  projectAmount: number;
+  reward: number;
+  createdAt: string;
 }
 
 // 物件
@@ -148,7 +164,26 @@ export interface EstimateSummary {
 export interface EstimateDetail extends Estimate {
   details: EstimateDetailItem[];
   house?: HouseSummary;
-  project?: ProjectSummary;
+  project?: {
+    id: string;
+    projectNumber: string;
+    status: string;
+  };
+  notes?: string | null;
+  internalMemo?: string | null;
+  updatedAt: string;
+  createdBy?: {
+    id: string;
+    name: string;
+  };
+  customer?: {
+    id: string;
+    name: string;
+    email?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    rank?: string;
+  };
 }
 
 export interface EstimateDetailItem {
@@ -345,6 +380,7 @@ export interface CreateEstimateRequest {
   title: string;
   estimateDate?: string;
   validUntil?: string;
+  status?: "draft" | "submitted" | "ordered" | "lost" | "pending";
   taxRate?: number;
   notes?: string;
   internalMemo?: string;

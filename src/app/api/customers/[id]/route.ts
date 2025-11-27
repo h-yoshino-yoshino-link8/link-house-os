@@ -59,13 +59,11 @@ export async function GET(
           orderBy: { createdAt: "desc" },
           take: 20,
         },
-        referrals: {
+        referredBy: {
           select: {
             id: true,
             name: true,
-            createdAt: true,
           },
-          take: 10,
         },
         _count: {
           select: {

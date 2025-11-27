@@ -18,18 +18,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -52,83 +40,16 @@ import {
   Plus,
   ExternalLink,
   Shield,
-  Wrench,
   CircleDot,
   Wallet,
-  Building,
   Phone,
   Mail,
+  Loader2,
 } from "lucide-react";
 import { PROJECT_STATUS } from "@/constants";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
-
-// デモデータ
-const projectData = {
-  id: "1",
-  projectNumber: "PRJ-2024-001",
-  title: "山田邸 外壁塗装工事",
-  status: "in_progress",
-  contractAmount: 1800000,
-  costBudget: 1200000,
-  costActual: 950000,
-  startDate: new Date("2024-10-01"),
-  endDate: new Date("2024-11-15"),
-  actualStart: new Date("2024-10-03"),
-  actualEnd: null,
-  progress: 65,
-  assignee: "佐藤",
-  description: "外壁の全面塗り替え工事。下地処理、シーラー塗布、中塗り・上塗りを実施。",
-  customer: {
-    id: "1",
-    name: "山田太郎",
-    phone: "090-1234-5678",
-    email: "yamada@example.com",
-    rank: "platinum",
-  },
-  house: {
-    id: "1",
-    name: "山田邸",
-    address: "東京都渋谷区○○1-2-3",
-    structureType: "wood",
-    builtYear: 2010,
-    healthScore: 82,
-  },
-  estimate: {
-    id: "EST-2024-001",
-    title: "山田邸 外壁塗装工事 見積",
-    amount: 1800000,
-    submittedAt: new Date("2024-09-15"),
-  },
-  schedules: [
-    { id: "1", name: "足場設置", startDate: new Date("2024-10-01"), endDate: new Date("2024-10-03"), progress: 100, assignee: "足場班" },
-    { id: "2", name: "高圧洗浄", startDate: new Date("2024-10-04"), endDate: new Date("2024-10-05"), progress: 100, assignee: "塗装班" },
-    { id: "3", name: "下地処理", startDate: new Date("2024-10-07"), endDate: new Date("2024-10-12"), progress: 100, assignee: "塗装班" },
-    { id: "4", name: "シーラー塗布", startDate: new Date("2024-10-14"), endDate: new Date("2024-10-16"), progress: 100, assignee: "塗装班" },
-    { id: "5", name: "中塗り", startDate: new Date("2024-10-17"), endDate: new Date("2024-10-22"), progress: 80, assignee: "塗装班" },
-    { id: "6", name: "上塗り", startDate: new Date("2024-10-24"), endDate: new Date("2024-10-30"), progress: 0, assignee: "塗装班" },
-    { id: "7", name: "足場解体", startDate: new Date("2024-11-01"), endDate: new Date("2024-11-02"), progress: 0, assignee: "足場班" },
-    { id: "8", name: "清掃・検査", startDate: new Date("2024-11-04"), endDate: new Date("2024-11-05"), progress: 0, assignee: "現場監督" },
-  ],
-  costs: [
-    { id: "1", category: "材料費", item: "塗料（シリコン系）", amount: 280000, date: new Date("2024-10-01") },
-    { id: "2", category: "材料費", item: "下地材・シーラー", amount: 85000, date: new Date("2024-10-01") },
-    { id: "3", category: "外注費", item: "足場設置・解体", amount: 180000, date: new Date("2024-10-03") },
-    { id: "4", category: "人件費", item: "塗装工事（10人工）", amount: 350000, date: new Date("2024-10-20") },
-    { id: "5", category: "経費", item: "養生材・消耗品", amount: 55000, date: new Date("2024-10-01") },
-  ],
-  photos: [
-    { id: "1", folder: "before", count: 12, thumbnail: "/placeholder-before.jpg" },
-    { id: "2", folder: "during", count: 28, thumbnail: "/placeholder-during.jpg" },
-    { id: "3", folder: "after", count: 0, thumbnail: null },
-  ],
-  documents: [
-    { id: "1", type: "contract", title: "工事請負契約書", createdAt: new Date("2024-09-20") },
-    { id: "2", type: "specification", title: "工事仕様書", createdAt: new Date("2024-09-20") },
-    { id: "3", type: "warranty", title: "保証書（下書き）", createdAt: new Date("2024-10-01") },
-  ],
-  nfts: [],
-};
+import { useProject } from "@/hooks/use-projects";
 
 const statusIcons: Record<string, React.ReactNode> = {
   planning: <CircleDot className="h-4 w-4 text-gray-500" />,
@@ -150,18 +71,53 @@ const statusColors: Record<string, string> = {
 
 export default function ProjectDetailPage() {
   const params = useParams();
-  const [isCostDialogOpen, setIsCostDialogOpen] = useState(false);
-  const project = projectData;
+  const projectId = params.id as string;
 
-  const profitAmount = project.contractAmount - project.costActual;
-  const profitRate = (profitAmount / project.contractAmount) * 100;
-  const budgetUsage = (project.costActual / project.costBudget) * 100;
-  const isOverBudget = project.costActual > project.costBudget;
+  const { data, isLoading, isError } = useProject(projectId);
+  const project = data?.data;
 
-  const costByCategory = project.costs.reduce((acc, cost) => {
-    acc[cost.category] = (acc[cost.category] || 0) + cost.amount;
-    return acc;
-  }, {} as Record<string, number>);
+  if (isLoading) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (isError || !project) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <p className="text-muted-foreground">案件データの取得に失敗しました</p>
+      </div>
+    );
+  }
+
+  const contractAmount = Number(project.contractAmount || 0);
+  const costBudget = Number(project.costBudget || 0);
+  const costActual = Number(project.costActual || 0);
+  const profitAmount = contractAmount - costActual;
+  const profitRate = contractAmount > 0 ? (profitAmount / contractAmount) * 100 : 0;
+  const budgetUsage = costBudget > 0 ? (costActual / costBudget) * 100 : 0;
+  const isOverBudget = costActual > costBudget;
+
+  // Calculate overall progress from schedules
+  const progress = project.schedules?.length > 0
+    ? Math.round(
+        project.schedules.reduce((sum, s) => sum + (s.progress || 0), 0) /
+          project.schedules.length
+      )
+    : 0;
+
+  // Group photos by folder
+  const photosByFolder = project.photos?.reduce(
+    (acc, photo) => {
+      const folder = photo.folder || "other";
+      if (!acc[folder]) acc[folder] = [];
+      acc[folder].push(photo);
+      return acc;
+    },
+    {} as Record<string, typeof project.photos>
+  );
 
   return (
     <div className="space-y-6">
@@ -218,7 +174,7 @@ export default function ProjectDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">¥{project.contractAmount.toLocaleString()}</div>
+            <div className="text-2xl font-bold">¥{contractAmount.toLocaleString()}</div>
           </CardContent>
         </Card>
         <Card>
@@ -248,11 +204,14 @@ export default function ProjectDetailPage() {
           </CardHeader>
           <CardContent>
             <div className="text-lg font-bold">
-              {format(project.startDate, "M/d", { locale: ja })} - {format(project.endDate, "M/d", { locale: ja })}
+              {project.startDate ? format(new Date(project.startDate), "M/d", { locale: ja }) : "-"}
+              {project.endDate && ` - ${format(new Date(project.endDate), "M/d", { locale: ja })}`}
             </div>
-            <p className="text-xs text-muted-foreground">
-              残り {Math.ceil((project.endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))} 日
-            </p>
+            {project.endDate && (
+              <p className="text-xs text-muted-foreground">
+                残り {Math.max(0, Math.ceil((new Date(project.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))} 日
+              </p>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -265,8 +224,8 @@ export default function ProjectDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{project.progress}%</div>
-            <Progress value={project.progress} className="mt-2 h-2" />
+            <div className="text-2xl font-bold">{progress}%</div>
+            <Progress value={progress} className="mt-2 h-2" />
           </CardContent>
         </Card>
       </div>
@@ -295,16 +254,20 @@ export default function ProjectDetailPage() {
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">顧客名</span>
-                  <Link href={`/customers/${project.customer.id}`} className="font-medium hover:underline">
-                    {project.customer.name}
-                  </Link>
+                  {project.customer ? (
+                    <Link href={`/customers/${project.customer.id}`} className="font-medium hover:underline">
+                      {project.customer.name}
+                    </Link>
+                  ) : (
+                    <span>-</span>
+                  )}
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">電話番号</span>
                   <span className="flex items-center gap-1">
                     <Phone className="h-3 w-3" />
-                    {project.customer.phone}
+                    -
                   </span>
                 </div>
                 <Separator />
@@ -312,7 +275,7 @@ export default function ProjectDetailPage() {
                   <span className="text-muted-foreground">メール</span>
                   <span className="flex items-center gap-1">
                     <Mail className="h-3 w-3" />
-                    {project.customer.email}
+                    -
                   </span>
                 </div>
               </CardContent>
@@ -329,19 +292,23 @@ export default function ProjectDetailPage() {
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">物件名</span>
-                  <Link href={`/houses/${project.house.id}`} className="font-medium hover:underline">
-                    {project.house.name}
-                  </Link>
+                  {project.house ? (
+                    <Link href={`/houses/${project.house.id}`} className="font-medium hover:underline">
+                      {project.customer?.name ?? ""}邸
+                    </Link>
+                  ) : (
+                    <span>-</span>
+                  )}
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">住所</span>
-                  <span>{project.house.address}</span>
+                  <span>{project.house?.address || "-"}</span>
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">健康スコア</span>
-                  <span className="font-bold text-lime-600">{project.house.healthScore}</span>
+                  <span className="font-bold text-lime-600">-</span>
                 </div>
               </CardContent>
             </Card>
@@ -353,40 +320,42 @@ export default function ProjectDetailPage() {
               <CardTitle>工事概要</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">{project.description}</p>
+              <p className="text-muted-foreground">{project.title}</p>
             </CardContent>
           </Card>
 
           {/* Related Estimate */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                関連見積
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div>
-                  <p className="font-medium">{project.estimate.title}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {project.estimate.id} / 提出日: {format(project.estimate.submittedAt, "yyyy/MM/dd")}
-                  </p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <p className="text-lg font-bold">¥{project.estimate.amount.toLocaleString()}</p>
+          {project.estimate && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  関連見積
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between rounded-lg border p-4">
+                  <div>
+                    <p className="font-medium">{project.estimate.title}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {project.estimate.estimateNumber} / 作成日: {format(new Date(project.estimate.createdAt), "yyyy/MM/dd")}
+                    </p>
                   </div>
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href={`/estimates/${project.estimate.id}`}>
-                      <ExternalLink className="mr-1 h-3 w-3" />
-                      見積を見る
-                    </Link>
-                  </Button>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <p className="text-lg font-bold">¥{Number(project.estimate.total).toLocaleString()}</p>
+                    </div>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/estimates/${project.estimate.id}`}>
+                        <ExternalLink className="mr-1 h-3 w-3" />
+                        見積を見る
+                      </Link>
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* Schedule Tab */}
@@ -404,33 +373,43 @@ export default function ProjectDetailPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>工程</TableHead>
-                    <TableHead>担当</TableHead>
-                    <TableHead>開始日</TableHead>
-                    <TableHead>終了日</TableHead>
-                    <TableHead>進捗</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {project.schedules.map((schedule) => (
-                    <TableRow key={schedule.id}>
-                      <TableCell className="font-medium">{schedule.name}</TableCell>
-                      <TableCell>{schedule.assignee}</TableCell>
-                      <TableCell>{format(schedule.startDate, "M/d", { locale: ja })}</TableCell>
-                      <TableCell>{format(schedule.endDate, "M/d", { locale: ja })}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Progress value={schedule.progress} className="h-2 w-20" />
-                          <span className="text-sm text-muted-foreground">{schedule.progress}%</span>
-                        </div>
-                      </TableCell>
+              {project.schedules?.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">
+                  工程が登録されていません
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>工程</TableHead>
+                      <TableHead>担当</TableHead>
+                      <TableHead>開始日</TableHead>
+                      <TableHead>終了日</TableHead>
+                      <TableHead>進捗</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {project.schedules?.map((schedule) => (
+                      <TableRow key={schedule.id}>
+                        <TableCell className="font-medium">{schedule.name}</TableCell>
+                        <TableCell>{schedule.assignee || "-"}</TableCell>
+                        <TableCell>
+                          {schedule.startDate ? format(new Date(schedule.startDate), "M/d", { locale: ja }) : "-"}
+                        </TableCell>
+                        <TableCell>
+                          {schedule.endDate ? format(new Date(schedule.endDate), "M/d", { locale: ja }) : "-"}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Progress value={schedule.progress || 0} className="h-2 w-20" />
+                            <span className="text-sm text-muted-foreground">{schedule.progress || 0}%</span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -444,7 +423,7 @@ export default function ProjectDetailPage() {
                 <CardTitle className="text-sm font-medium text-muted-foreground">原価予算</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">¥{project.costBudget.toLocaleString()}</div>
+                <div className="text-2xl font-bold">¥{costBudget.toLocaleString()}</div>
               </CardContent>
             </Card>
             <Card>
@@ -453,7 +432,7 @@ export default function ProjectDetailPage() {
               </CardHeader>
               <CardContent>
                 <div className={`text-2xl font-bold ${isOverBudget ? "text-red-600" : ""}`}>
-                  ¥{project.costActual.toLocaleString()}
+                  ¥{costActual.toLocaleString()}
                 </div>
                 {isOverBudget && (
                   <p className="text-xs text-red-600 flex items-center gap-1">
@@ -476,112 +455,36 @@ export default function ProjectDetailPage() {
             </Card>
           </div>
 
-          {/* Cost by Category */}
           <Card>
             <CardHeader>
-              <CardTitle>カテゴリ別原価</CardTitle>
+              <CardTitle>原価概要</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {Object.entries(costByCategory).map(([category, amount]) => (
-                  <div key={category} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="h-3 w-3 rounded-full bg-primary" />
-                      <span>{category}</span>
-                    </div>
-                    <span className="font-medium">¥{amount.toLocaleString()}</span>
-                  </div>
-                ))}
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">契約金額</span>
+                  <span className="font-medium">¥{contractAmount.toLocaleString()}</span>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">原価予算</span>
+                  <span className="font-medium">¥{costBudget.toLocaleString()}</span>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">原価実績</span>
+                  <span className={`font-medium ${isOverBudget ? "text-red-600" : ""}`}>
+                    ¥{costActual.toLocaleString()}
+                  </span>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">粗利</span>
+                  <span className={`font-bold ${profitAmount >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    ¥{profitAmount.toLocaleString()} ({profitRate.toFixed(1)}%)
+                  </span>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Cost Details */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>原価明細</CardTitle>
-                <Dialog open={isCostDialogOpen} onOpenChange={setIsCostDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="mr-2 h-4 w-4" />
-                      原価追加
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>原価追加</DialogTitle>
-                      <DialogDescription>原価明細を追加します</DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                      <div className="space-y-2">
-                        <Label>カテゴリ</Label>
-                        <Select>
-                          <SelectTrigger>
-                            <SelectValue placeholder="選択" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="material">材料費</SelectItem>
-                            <SelectItem value="labor">人件費</SelectItem>
-                            <SelectItem value="outsource">外注費</SelectItem>
-                            <SelectItem value="expense">経費</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>項目名</Label>
-                        <Input placeholder="塗料（シリコン系）" />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>金額</Label>
-                          <Input type="number" placeholder="100000" />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>日付</Label>
-                          <Input type="date" />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>備考</Label>
-                        <Textarea placeholder="備考があれば入力" />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setIsCostDialogOpen(false)}>
-                        キャンセル
-                      </Button>
-                      <Button onClick={() => setIsCostDialogOpen(false)}>追加</Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>日付</TableHead>
-                    <TableHead>カテゴリ</TableHead>
-                    <TableHead>項目</TableHead>
-                    <TableHead className="text-right">金額</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {project.costs.map((cost) => (
-                    <TableRow key={cost.id}>
-                      <TableCell>{format(cost.date, "M/d", { locale: ja })}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{cost.category}</Badge>
-                      </TableCell>
-                      <TableCell>{cost.item}</TableCell>
-                      <TableCell className="text-right font-medium">
-                        ¥{cost.amount.toLocaleString()}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
             </CardContent>
           </Card>
         </TabsContent>
@@ -601,30 +504,39 @@ export default function ProjectDetailPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-3">
-                {project.photos.map((folder) => (
-                  <Card key={folder.id} className="overflow-hidden">
-                    <div className="aspect-video bg-muted flex items-center justify-center">
-                      <Camera className="h-12 w-12 text-muted-foreground" />
-                    </div>
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium capitalize">
-                            {folder.folder === "before" ? "施工前" : folder.folder === "during" ? "施工中" : "施工後"}
-                          </p>
-                          <p className="text-sm text-muted-foreground">{folder.count}枚</p>
+              {project.photos?.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">
+                  写真がまだ登録されていません
+                </p>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-3">
+                  {["before", "during", "after"].map((folder) => {
+                    const photos = photosByFolder?.[folder] || [];
+                    return (
+                      <Card key={folder} className="overflow-hidden">
+                        <div className="aspect-video bg-muted flex items-center justify-center">
+                          <Camera className="h-12 w-12 text-muted-foreground" />
                         </div>
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={`/photos?project=${project.id}&folder=${folder.folder}`}>
-                            見る
-                          </Link>
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium">
+                                {folder === "before" ? "施工前" : folder === "during" ? "施工中" : "施工後"}
+                              </p>
+                              <p className="text-sm text-muted-foreground">{photos.length}枚</p>
+                            </div>
+                            <Button variant="outline" size="sm" asChild>
+                              <Link href={`/photos?project=${project.id}&folder=${folder}`}>
+                                見る
+                              </Link>
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -644,34 +556,9 @@ export default function ProjectDetailPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>書類名</TableHead>
-                    <TableHead>種類</TableHead>
-                    <TableHead>作成日</TableHead>
-                    <TableHead className="w-[100px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {project.documents.map((doc) => (
-                    <TableRow key={doc.id}>
-                      <TableCell className="font-medium">{doc.title}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {doc.type === "contract" ? "契約書" : doc.type === "specification" ? "仕様書" : "保証書"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{format(doc.createdAt, "yyyy/MM/dd")}</TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm">
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <p className="text-muted-foreground text-center py-8">
+                書類管理機能は準備中です
+              </p>
             </CardContent>
           </Card>
 
@@ -693,14 +580,40 @@ export default function ProjectDetailPage() {
               </div>
             </CardHeader>
             <CardContent>
-              {project.nfts.length === 0 ? (
+              {project.workCertificates?.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                   <Shield className="h-12 w-12 mb-2" />
                   <p>施工証明NFTはまだ発行されていません</p>
                   <p className="text-sm">工事完了後に発行できます</p>
                 </div>
               ) : (
-                <div>NFT一覧</div>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {project.workCertificates?.map((nft) => (
+                    <Card key={nft.id} className="overflow-hidden">
+                      <div className="aspect-video bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                        <Shield className="h-16 w-16 text-white/80" />
+                      </div>
+                      <CardContent className="p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="font-medium">{nft.workType || "施工証明"}</p>
+                          <Badge variant="outline">
+                            <CheckCircle2 className="mr-1 h-3 w-3 text-green-600" />
+                            認証済
+                          </Badge>
+                        </div>
+                        {nft.nftTokenId && (
+                          <p className="text-xs text-muted-foreground font-mono truncate">
+                            Token: {nft.nftTokenId}
+                          </p>
+                        )}
+                        <Button variant="outline" size="sm" className="w-full">
+                          <ExternalLink className="mr-2 h-3 w-3" />
+                          ブロックチェーンで確認
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
               )}
             </CardContent>
           </Card>
