@@ -1,0 +1,660 @@
+// ============================================
+// LinK HOUSE OS - Database Schema
+// ============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// 会社・ユーザー管理
+// ============================================
+
+model Company {
+  id                 String   @id @default(cuid())
+  name               String
+  licenseNumber      String?  @map("license_number")
+  address            String?
+  phone              String?
+  email              String?
+  logoUrl            String?  @map("logo_url")
+  sealUrl            String?  @map("seal_url")
+
+  // Stripe連携
+  stripeCustomerId   String?  @map("stripe_customer_id")
+  subscriptionPlan   String?  @map("subscription_plan")
+  subscriptionStatus String?  @map("subscription_status")
+
+  // ゲーミフィケーション
+  level              Int      @default(1)
+  xp                 Int      @default(0)
+
+  // 紹介
+  referralCode       String?  @unique @map("referral_code")
+  referredById       String?  @map("referred_by_id")
+  referredBy         Company? @relation("CompanyReferral", fields: [referredById], references: [id])
+  referrals          Company[] @relation("CompanyReferral")
+
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  users              User[]
+  customers          Customer[]
+  houses             House[]
+  estimates          Estimate[]
+  projects           Project[]
+  workCategories     WorkCategory[]
+  materials          Material[]
+  laborTypes         LaborType[]
+  xpTransactions     XpTransaction[]
+  userBadges         UserBadge[]
+
+  @@map("companies")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  companyId String   @map("company_id")
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  clerkId   String   @unique @map("clerk_id")
+  email     String
+  name      String
+  role      String   @default("staff") // admin, manager, staff
+  avatarUrl String?  @map("avatar_url")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  estimates Estimate[] @relation("CreatedEstimates")
+
+  @@map("users")
+}
+
+// ============================================
+// 顧客管理
+// ============================================
+
+model Customer {
+  id               String   @id @default(cuid())
+  companyId        String   @map("company_id")
+  company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  type             String   @default("individual") // individual, corporate
+  name             String
+  email            String?
+  phone            String?
+  address          String?
+
+  // タグ・カスタム属性
+  tags             String[] @default([])
+  customFields     Json?    @map("custom_fields")
+
+  // ランク・ポイント
+  rank             String   @default("member") // member, silver, gold, platinum, diamond
+  totalTransaction Decimal  @default(0) @map("total_transaction") @db.Decimal(15, 2)
+  points           Int      @default(0)
+
+  // 紹介
+  referralCode     String?  @unique @map("referral_code")
+  referredById     String?  @map("referred_by_id")
+  referredBy       Customer? @relation("CustomerReferral", fields: [referredById], references: [id])
+  referrals        Customer[] @relation("CustomerReferral")
+
+  // ポータルログイン用
+  portalUserId     String?  @map("portal_user_id")
+
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  houses           House[]
+  estimates        Estimate[]
+  projects         Project[]
+  savingsContracts SavingsContract[]
+  pointTransactions PointTransaction[]
+
+  @@map("customers")
+}
+
+// ============================================
+// HOUSE DNA（家のデジタルツイン）
+// ============================================
+
+model House {
+  id                  String   @id @default(cuid())
+  customerId          String   @map("customer_id")
+  customer            Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  companyId           String   @map("company_id")
+  company             Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  address             String
+  addressNormalized   String?  @map("address_normalized")
+  geoLat              Decimal? @map("geo_lat") @db.Decimal(10, 8)
+  geoLng              Decimal? @map("geo_lng") @db.Decimal(11, 8)
+
+  structureType       String?  @map("structure_type") // wood, rc, steel, src
+  floors              Int?
+  totalArea           Decimal? @map("total_area") @db.Decimal(10, 2)
+  landArea            Decimal? @map("land_area") @db.Decimal(10, 2)
+  builtYear           Int?     @map("built_year")
+  builder             String?
+
+  healthScore         Int      @default(100) @map("health_score")
+  nftPassportTokenId  String?  @map("nft_passport_token_id")
+
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  components          HouseComponent[]
+  maintenanceRecs     MaintenanceRecommendation[]
+  estimates           Estimate[]
+  projects            Project[]
+  workCertificates    WorkCertificate[]
+  savingsContracts    SavingsContract[]
+
+  @@map("houses")
+}
+
+model HouseComponent {
+  id               String   @id @default(cuid())
+  houseId          String   @map("house_id")
+  house            House    @relation(fields: [houseId], references: [id], onDelete: Cascade)
+
+  category         String   // roof, exterior, interior, equipment, electrical, plumbing
+  subcategory      String?
+  productName      String?  @map("product_name")
+  manufacturer     String?
+  modelNumber      String?  @map("model_number")
+
+  installedDate    DateTime? @map("installed_date")
+  warrantyYears    Int?     @map("warranty_years")
+  warrantyExpires  DateTime? @map("warranty_expires")
+  expectedLifespan Int?     @map("expected_lifespan")
+  replacementCost  Decimal? @map("replacement_cost") @db.Decimal(12, 2)
+
+  conditionScore   Int      @default(100) @map("condition_score")
+  lastInspection   DateTime? @map("last_inspection")
+
+  photos           String[] @default([])
+  documents        String[] @default([])
+  nftTokenId       String?  @map("nft_token_id")
+
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  maintenanceRecs  MaintenanceRecommendation[]
+
+  @@map("house_components")
+}
+
+model MaintenanceRecommendation {
+  id              String   @id @default(cuid())
+  houseId         String   @map("house_id")
+  house           House    @relation(fields: [houseId], references: [id], onDelete: Cascade)
+  componentId     String?  @map("component_id")
+  component       HouseComponent? @relation(fields: [componentId], references: [id])
+
+  riskLevel       String   // high, medium, low
+  description     String
+  recommendedAction String? @map("recommended_action")
+  dueDate         DateTime? @map("due_date")
+  estimatedCostMin Decimal? @map("estimated_cost_min") @db.Decimal(12, 2)
+  estimatedCostMax Decimal? @map("estimated_cost_max") @db.Decimal(12, 2)
+
+  isResolved      Boolean  @default(false) @map("is_resolved")
+  resolvedAt      DateTime? @map("resolved_at")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("maintenance_recommendations")
+}
+
+// ============================================
+// マスタデータ
+// ============================================
+
+model WorkCategory {
+  id          String   @id @default(cuid())
+  companyId   String   @map("company_id")
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  parentId    String?  @map("parent_id")
+  parent      WorkCategory? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    WorkCategory[] @relation("CategoryHierarchy")
+
+  name        String
+  code        String?
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  materials   Material[]
+  laborTypes  LaborType[]
+
+  @@map("work_categories")
+}
+
+model Material {
+  id              String   @id @default(cuid())
+  companyId       String   @map("company_id")
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  categoryId      String?  @map("category_id")
+  category        WorkCategory? @relation(fields: [categoryId], references: [id])
+
+  name            String
+  productCode     String?  @map("product_code")
+  manufacturer    String?
+  specification   String?
+
+  costPrice       Decimal  @map("cost_price") @db.Decimal(12, 2)
+  unit            String   // m, m2, piece, set, etc.
+  lossRate        Decimal  @default(0) @map("loss_rate") @db.Decimal(5, 2)
+
+  supplierId      String?  @map("supplier_id")
+  supplierName    String?  @map("supplier_name")
+
+  isActive        Boolean  @default(true) @map("is_active")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("materials")
+}
+
+model LaborType {
+  id            String   @id @default(cuid())
+  companyId     String   @map("company_id")
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  categoryId    String?  @map("category_id")
+  category      WorkCategory? @relation(fields: [categoryId], references: [id])
+
+  name          String   // 大工, クロス職人, 電気工事士, etc.
+  dailyRate     Decimal  @map("daily_rate") @db.Decimal(10, 2)
+  hourlyRate    Decimal? @map("hourly_rate") @db.Decimal(10, 2)
+  productivity  Decimal? @db.Decimal(10, 4) // 歩掛り
+
+  isActive      Boolean  @default(true) @map("is_active")
+
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("labor_types")
+}
+
+// ============================================
+// 見積・原価管理
+// ============================================
+
+model Estimate {
+  id              String   @id @default(cuid())
+  companyId       String   @map("company_id")
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customerId      String   @map("customer_id")
+  customer        Customer @relation(fields: [customerId], references: [id])
+  houseId         String?  @map("house_id")
+  house           House?   @relation(fields: [houseId], references: [id])
+
+  estimateNumber  String   @map("estimate_number")
+  title           String
+  estimateDate    DateTime @map("estimate_date")
+  validUntil      DateTime? @map("valid_until")
+
+  status          String   @default("draft") // draft, submitted, ordered, lost, pending
+
+  subtotal        Decimal  @default(0) @db.Decimal(15, 2)
+  taxRate         Decimal  @default(10) @map("tax_rate") @db.Decimal(5, 2)
+  tax             Decimal  @default(0) @db.Decimal(15, 2)
+  total           Decimal  @default(0) @db.Decimal(15, 2)
+
+  costTotal       Decimal  @default(0) @map("cost_total") @db.Decimal(15, 2)
+  profit          Decimal  @default(0) @db.Decimal(15, 2)
+  profitRate      Decimal  @default(0) @map("profit_rate") @db.Decimal(5, 2)
+
+  notes           String?
+  internalMemo    String?  @map("internal_memo")
+
+  createdById     String?  @map("created_by_id")
+  createdBy       User?    @relation("CreatedEstimates", fields: [createdById], references: [id])
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  details         EstimateDetail[]
+  project         Project?
+
+  @@unique([companyId, estimateNumber])
+  @@map("estimates")
+}
+
+model EstimateDetail {
+  id            String   @id @default(cuid())
+  estimateId    String   @map("estimate_id")
+  estimate      Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+
+  parentId      String?  @map("parent_id")
+  parent        EstimateDetail? @relation("DetailHierarchy", fields: [parentId], references: [id])
+  children      EstimateDetail[] @relation("DetailHierarchy")
+
+  sortOrder     Int      @default(0) @map("sort_order")
+  name          String
+  specification String?
+
+  quantity      Decimal  @default(1) @db.Decimal(10, 3)
+  unit          String?
+
+  // 原価
+  costMaterial  Decimal  @default(0) @map("cost_material") @db.Decimal(12, 2)
+  costLabor     Decimal  @default(0) @map("cost_labor") @db.Decimal(12, 2)
+  costUnit      Decimal  @default(0) @map("cost_unit") @db.Decimal(12, 2)
+  costTotal     Decimal  @default(0) @map("cost_total") @db.Decimal(12, 2)
+
+  // 客出し
+  profitRate    Decimal  @default(25) @map("profit_rate") @db.Decimal(5, 2)
+  priceUnit     Decimal  @default(0) @map("price_unit") @db.Decimal(12, 2)
+  priceTotal    Decimal  @default(0) @map("price_total") @db.Decimal(12, 2)
+
+  internalMemo  String?  @map("internal_memo")
+
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("estimate_details")
+}
+
+// ============================================
+// 工事・プロジェクト
+// ============================================
+
+model Project {
+  id              String   @id @default(cuid())
+  companyId       String   @map("company_id")
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customerId      String   @map("customer_id")
+  customer        Customer @relation(fields: [customerId], references: [id])
+  houseId         String?  @map("house_id")
+  house           House?   @relation(fields: [houseId], references: [id])
+  estimateId      String?  @unique @map("estimate_id")
+  estimate        Estimate? @relation(fields: [estimateId], references: [id])
+
+  projectNumber   String   @map("project_number")
+  title           String
+
+  status          String   @default("planning") // planning, contracted, in_progress, completed, invoiced, paid
+
+  contractAmount  Decimal? @map("contract_amount") @db.Decimal(15, 2)
+  costBudget      Decimal? @map("cost_budget") @db.Decimal(15, 2)
+  costActual      Decimal? @map("cost_actual") @db.Decimal(15, 2)
+
+  startDate       DateTime? @map("start_date")
+  endDate         DateTime? @map("end_date")
+  actualStart     DateTime? @map("actual_start")
+  actualEnd       DateTime? @map("actual_end")
+
+  // NFT
+  nftTokenId      String?  @map("nft_token_id")
+  blockchainTx    String?  @map("blockchain_tx")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  schedules       Schedule[]
+  photos          Photo[]
+  workCertificates WorkCertificate[]
+  savingsTransactions SavingsTransaction[]
+
+  @@unique([companyId, projectNumber])
+  @@map("projects")
+}
+
+model Schedule {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  parentId    String?  @map("parent_id")
+  parent      Schedule? @relation("ScheduleHierarchy", fields: [parentId], references: [id])
+  children    Schedule[] @relation("ScheduleHierarchy")
+
+  name        String
+  assignee    String?
+  color       String?
+
+  startDate   DateTime @map("start_date")
+  endDate     DateTime @map("end_date")
+
+  progress    Int      @default(0) // 0-100
+
+  dependsOnId String?  @map("depends_on_id")
+  dependsOn   Schedule? @relation("ScheduleDependency", fields: [dependsOnId], references: [id])
+  dependents  Schedule[] @relation("ScheduleDependency")
+
+  notes       String?
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("schedules")
+}
+
+model Photo {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  url         String
+  thumbnailUrl String? @map("thumbnail_url")
+  originalUrl String?  @map("original_url")
+
+  folder      String?  // before, during, after, custom
+  tags        String[] @default([])
+  caption     String?
+
+  takenAt     DateTime? @map("taken_at")
+  geoLat      Decimal? @map("geo_lat") @db.Decimal(10, 8)
+  geoLng      Decimal? @map("geo_lng") @db.Decimal(11, 8)
+
+  // 注釈データ（JSON）
+  annotations Json?
+
+  sortOrder   Int      @default(0) @map("sort_order")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("photos")
+}
+
+// ============================================
+// 施工証明NFT
+// ============================================
+
+model WorkCertificate {
+  id               String   @id @default(cuid())
+  projectId        String   @map("project_id")
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  houseId          String   @map("house_id")
+  house            House    @relation(fields: [houseId], references: [id])
+
+  nftTokenId       String?  @map("nft_token_id")
+  blockchainTx     String?  @map("blockchain_tx")
+
+  workType         String   @map("work_type")
+  workDate         DateTime @map("work_date")
+  contractorName   String   @map("contractor_name")
+  contractorLicense String? @map("contractor_license")
+
+  craftsmen        Json?    // 職人情報配列
+  materials        Json?    // 使用材料配列
+
+  warrantyYears    Int?     @map("warranty_years")
+  warrantyExpires  DateTime? @map("warranty_expires")
+  warrantyCoverage String?  @map("warranty_coverage")
+
+  photosIpfs       String?  @map("photos_ipfs")
+  documentsIpfs    String?  @map("documents_ipfs")
+  metadataIpfs     String?  @map("metadata_ipfs")
+
+  issuedAt         DateTime @default(now()) @map("issued_at")
+
+  @@map("work_certificates")
+}
+
+// ============================================
+// 積立・ポイント
+// ============================================
+
+model SavingsContract {
+  id                   String   @id @default(cuid())
+  customerId           String   @map("customer_id")
+  customer             Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  houseId              String   @map("house_id")
+  house                House    @relation(fields: [houseId], references: [id])
+
+  plan                 String   // light, standard, premium
+  monthlyAmount        Decimal  @map("monthly_amount") @db.Decimal(10, 2)
+  savingsAmount        Decimal  @map("savings_amount") @db.Decimal(10, 2)
+  serviceAmount        Decimal  @map("service_amount") @db.Decimal(10, 2)
+
+  balance              Decimal  @default(0) @db.Decimal(15, 2)
+  bonusBalance         Decimal  @default(0) @map("bonus_balance") @db.Decimal(15, 2)
+
+  startDate            DateTime @map("start_date")
+  status               String   @default("active") // active, paused, cancelled
+
+  stripeSubscriptionId String?  @map("stripe_subscription_id")
+
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  transactions         SavingsTransaction[]
+
+  @@map("savings_contracts")
+}
+
+model SavingsTransaction {
+  id           String   @id @default(cuid())
+  contractId   String   @map("contract_id")
+  contract     SavingsContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  type         String   // deposit, bonus, withdrawal, refund
+  amount       Decimal  @db.Decimal(12, 2)
+  balanceAfter Decimal  @map("balance_after") @db.Decimal(15, 2)
+
+  description  String?
+  projectId    String?  @map("project_id")
+  project      Project? @relation(fields: [projectId], references: [id])
+
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("savings_transactions")
+}
+
+model PointTransaction {
+  id           String   @id @default(cuid())
+  customerId   String   @map("customer_id")
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  type         String   // contract, referral, review, survey, birthday
+  points       Int
+  balanceAfter Int      @map("balance_after")
+
+  description  String?
+  relatedId    String?  @map("related_id")
+
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("point_transactions")
+}
+
+// ============================================
+// 紹介プログラム
+// ============================================
+
+model Referral {
+  id               String   @id @default(cuid())
+
+  referrerType     String   @map("referrer_type") // company, customer
+  referrerId       String   @map("referrer_id")
+  refereeType      String   @map("referee_type") // company, customer
+  refereeId        String   @map("referee_id")
+  referralCode     String   @map("referral_code")
+
+  status           String   @default("pending") // pending, converted, paid
+  conversionType   String?  @map("conversion_type") // pro_purchase, subscription, contract, savings
+  conversionAmount Decimal? @map("conversion_amount") @db.Decimal(15, 2)
+
+  rewardAmount     Decimal? @map("reward_amount") @db.Decimal(12, 2)
+  rewardPaidAt     DateTime? @map("reward_paid_at")
+  stripeTransferId String?  @map("stripe_transfer_id")
+
+  createdAt        DateTime @default(now()) @map("created_at")
+  convertedAt      DateTime? @map("converted_at")
+
+  @@map("referrals")
+}
+
+// ============================================
+// ゲーミフィケーション
+// ============================================
+
+model Badge {
+  id             String   @id @default(cuid())
+  code           String   @unique
+  name           String
+  description    String?
+  iconUrl        String?  @map("icon_url")
+
+  conditionType  String   @map("condition_type")
+  conditionValue Int      @map("condition_value")
+  xpReward       Int      @default(0) @map("xp_reward")
+
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  // Relations
+  userBadges     UserBadge[]
+
+  @@map("badges")
+}
+
+model UserBadge {
+  id        String   @id @default(cuid())
+  companyId String   @map("company_id")
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  badgeId   String   @map("badge_id")
+  badge     Badge    @relation(fields: [badgeId], references: [id])
+
+  earnedAt  DateTime @default(now()) @map("earned_at")
+
+  @@unique([companyId, badgeId])
+  @@map("user_badges")
+}
+
+model XpTransaction {
+  id          String   @id @default(cuid())
+  companyId   String   @map("company_id")
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  action      String   // login, estimate_created, project_completed, etc.
+  xp          Int
+  description String?
+
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("xp_transactions")
+}
