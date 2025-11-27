@@ -192,6 +192,16 @@ export async function GET(request: NextRequest) {
       ? ((currentProfit - lastProfit) / lastProfit) * 100
       : 0;
 
+    // 粗利率計算
+    const currentProfitRate = currentRevenue > 0 ? (currentProfit / currentRevenue) * 100 : 0;
+    const lastProfitRate = lastRevenue > 0 ? (lastProfit / lastRevenue) * 100 : 0;
+    const profitRateChange = currentProfitRate - lastProfitRate;
+
+    // 平均単価計算
+    const currentAvgPrice = currentMonthProjects.length > 0 ? currentRevenue / currentMonthProjects.length : 0;
+    const lastAvgPrice = lastMonthProjects.length > 0 ? lastRevenue / lastMonthProjects.length : 0;
+    const avgPriceChange = lastAvgPrice > 0 ? ((currentAvgPrice - lastAvgPrice) / lastAvgPrice) * 100 : 0;
+
     const currentOrdered = currentMonthEstimates.filter(e => e.status === "ordered").length;
     const currentOrderRate = currentMonthEstimates.length > 0
       ? (currentOrdered / currentMonthEstimates.length) * 100
@@ -205,6 +215,15 @@ export async function GET(request: NextRequest) {
     const completedCount = currentMonthProjects.length;
     const lastCompletedCount = lastMonthProjects.length;
     const completedChange = completedCount - lastCompletedCount;
+
+    // 協力会社ランキング（デモデータ - Partnerモデルが実装されたら実データに切り替え）
+    const topPartners = [
+      { id: "1", name: "山田電気工事", totalTransaction: 1500000, category: "電気工事" },
+      { id: "2", name: "佐藤設備", totalTransaction: 1200000, category: "設備工事" },
+      { id: "3", name: "鈴木建材", totalTransaction: 980000, category: "建材販売" },
+      { id: "4", name: "田中塗装", totalTransaction: 750000, category: "塗装工事" },
+      { id: "5", name: "高橋工務店", totalTransaction: 600000, category: "大工工事" },
+    ];
 
     // 売上推移データ（過去5ヶ月）
     const revenueData = await Promise.all(
@@ -322,6 +341,16 @@ export async function GET(request: NextRequest) {
             change: profitChange,
             trend: profitChange >= 0 ? "up" : "down",
           },
+          profitRate: {
+            value: currentProfitRate,
+            change: profitRateChange,
+            trend: profitRateChange >= 0 ? "up" : "down",
+          },
+          avgPrice: {
+            value: currentAvgPrice,
+            change: avgPriceChange,
+            trend: avgPriceChange >= 0 ? "up" : "down",
+          },
           orderRate: {
             value: currentOrderRate,
             change: orderRateChange,
@@ -337,6 +366,11 @@ export async function GET(request: NextRequest) {
         topCustomers: topCustomers.map(c => ({
           name: c.name,
           revenue: Number(c.totalTransaction),
+        })),
+        topPartners: topPartners.map(p => ({
+          name: p.name,
+          revenue: Number(p.totalTransaction),
+          category: p.category,
         })),
         alerts: formattedAlerts,
         quests,

@@ -146,8 +146,8 @@ export const NAVIGATION = [
     icon: "Camera",
   },
   {
-    title: "分析",
-    href: "/analytics",
+    title: "レポート",
+    href: "/reports",
     icon: "BarChart3",
   },
 ] as const;

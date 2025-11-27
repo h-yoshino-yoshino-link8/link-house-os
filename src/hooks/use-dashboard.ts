@@ -8,11 +8,14 @@ export interface DashboardData {
   kpis: {
     revenue: KpiValue;
     profit: KpiValue;
+    profitRate: KpiValue;
+    avgPrice: KpiValue;
     orderRate: KpiValue;
     completedProjects: KpiValue;
   };
   revenueData: RevenueDataPoint[];
   topCustomers: TopCustomer[];
+  topPartners: TopPartner[];
   alerts: DashboardAlert[];
   quests: Quest[];
   highlights: Highlights;
@@ -34,6 +37,12 @@ export interface RevenueDataPoint {
 export interface TopCustomer {
   name: string;
   revenue: number;
+}
+
+export interface TopPartner {
+  name: string;
+  revenue: number;
+  category: string | null;
 }
 
 export interface DashboardAlert {
