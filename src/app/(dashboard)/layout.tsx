@@ -1,6 +1,9 @@
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { Header } from "@/components/dashboard/header";
 
+// 認証が必要なページは動的レンダリングを強制
+export const dynamic = "force-dynamic";
+
 export default function DashboardLayout({
   children,
 }: {

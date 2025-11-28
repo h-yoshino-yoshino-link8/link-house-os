@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Noto_Sans_JP } from "next/font/google";
-import { ClerkProvider } from "@clerk/nextjs";
-import { jaJP } from "@clerk/localizations";
+import { ClerkProviderWrapper } from "@/components/providers/clerk-provider-wrapper";
 import { QueryProvider } from "@/components/providers/query-provider";
 import "./globals.css";
 
@@ -23,12 +22,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider localization={jaJP}>
-      <html lang="ja" suppressHydrationWarning>
-        <body className={`${notoSansJP.variable} font-sans antialiased`}>
+    <html lang="ja" suppressHydrationWarning>
+      <body className={`${notoSansJP.variable} font-sans antialiased`}>
+        <ClerkProviderWrapper>
           <QueryProvider>{children}</QueryProvider>
-        </body>
-      </html>
-    </ClerkProvider>
+        </ClerkProviderWrapper>
+      </body>
+    </html>
   );
 }
