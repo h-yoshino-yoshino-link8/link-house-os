@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { ESTIMATE_STATUS } from "@/constants";
 import { formatDate } from "@/lib/utils/date";
+import { downloadCSV, formatEstimatesForExport } from "@/lib/utils/export";
 import { useEstimates, useDeleteEstimate } from "@/hooks/use-estimates";
 import { useAppStore, DEMO_COMPANY_ID } from "@/stores/app-store";
 import type { Estimate } from "@/lib/api/types";
@@ -111,12 +112,26 @@ export default function EstimatesPage() {
           <h1 className="text-3xl font-bold">見積管理</h1>
           <p className="text-muted-foreground">見積書の作成・管理・提出</p>
         </div>
-        <Button asChild>
-          <Link href="/estimates/new">
-            <Plus className="mr-2 h-4 w-4" />
-            新規見積作成
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (estimates.length > 0) {
+                downloadCSV(formatEstimatesForExport(estimates), "見積一覧");
+              }
+            }}
+            disabled={estimates.length === 0}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            CSV出力
+          </Button>
+          <Button asChild>
+            <Link href="/estimates/new">
+              <Plus className="mr-2 h-4 w-4" />
+              新規見積作成
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
