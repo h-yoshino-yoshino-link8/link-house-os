@@ -12,6 +12,10 @@ const isProtectedRoute = createRouteMatcher([
   "/documents(.*)",
   "/analytics(.*)",
   "/settings(.*)",
+  "/invoices(.*)",
+  "/reports(.*)",
+  "/savings(.*)",
+  "/gamification(.*)",
 ]);
 
 // 公開ルート（認証不要）
