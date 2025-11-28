@@ -20,80 +20,10 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useState, useEffect } from "react";
-
-// Clerk環境変数が設定されているかチェック（クライアントサイドで実行）
-function useClerkEnabled() {
-  const [enabled, setEnabled] = useState(false);
-
-  useEffect(() => {
-    const key = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-    const isEnabled = !!(key && key !== "pk_test_your_key_here" && key.length >= 20);
-    setEnabled(isEnabled);
-  }, []);
-
-  return enabled;
-}
-
-// Clerkコンポーネントを安全にロード
-function ClerkUserButton() {
-  const [UserButton, setUserButton] = useState<React.ComponentType<{ afterSignOutUrl: string; appearance: object }> | null>(null);
-
-  useEffect(() => {
-    // 動的インポートで安全にClerkをロード
-    import("@clerk/nextjs")
-      .then((module) => {
-        setUserButton(() => module.UserButton);
-      })
-      .catch((error) => {
-        console.log("Clerk not available:", error);
-      });
-  }, []);
-
-  if (!UserButton) {
-    return <FallbackUserButton />;
-  }
-
-  return (
-    <UserButton
-      afterSignOutUrl="/sign-in"
-      appearance={{
-        elements: {
-          avatarBox: "h-8 w-8",
-        },
-      }}
-    />
-  );
-}
-
-// フォールバックユーザーボタン
-function FallbackUserButton() {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="rounded-full">
-          <Avatar className="h-8 w-8">
-            <AvatarFallback>
-              <User className="h-4 w-4" />
-            </AvatarFallback>
-          </Avatar>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuLabel>デモユーザー</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem>プロフィール</DropdownMenuItem>
-        <DropdownMenuItem>設定</DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem>ログアウト</DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
+import { UserButton } from "@clerk/nextjs";
 
 export function Header() {
   const { company, notifications, unreadCount } = useAppStore();
-  const clerkEnabled = useClerkEnabled();
 
   return (
     <header className="flex h-16 items-center justify-between border-b bg-background px-6">
@@ -169,8 +99,15 @@ export function Header() {
           <HelpCircle className="h-5 w-5" />
         </Button>
 
-        {/* User menu - Clerkがある場合のみClerkUserButtonを使用 */}
-        {clerkEnabled ? <ClerkUserButton /> : <FallbackUserButton />}
+        {/* User menu */}
+        <UserButton
+          afterSignOutUrl="/sign-in"
+          appearance={{
+            elements: {
+              avatarBox: "h-8 w-8",
+            },
+          }}
+        />
       </div>
     </header>
   );
