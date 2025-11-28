@@ -1,15 +1,15 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
 import type { Company, User } from "@/types";
 
 // 開発用デモ会社ID（本番環境ではClerk認証から取得）
-export const DEMO_COMPANY_ID = "demo-company-001";
+export const DEMO_COMPANY_ID = "demo-company";
 
 interface AppState {
   // 現在のユーザー・会社
   user: User | null;
   company: Company | null;
-  companyId: string | null;
+  companyId: string;
 
   // サイドバー状態
   sidebarOpen: boolean;
@@ -19,10 +19,14 @@ interface AppState {
   notifications: Notification[];
   unreadCount: number;
 
+  // ハイドレーション状態
+  _hasHydrated: boolean;
+  setHasHydrated: (state: boolean) => void;
+
   // アクション
   setUser: (user: User | null) => void;
   setCompany: (company: Company | null) => void;
-  setCompanyId: (companyId: string | null) => void;
+  setCompanyId: (companyId: string) => void;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   addNotification: (notification: Notification) => void;
@@ -44,12 +48,14 @@ export const useAppStore = create<AppState>()(
     (set) => ({
       user: null,
       company: null,
-      companyId: DEMO_COMPANY_ID, // 開発時はデモ会社IDをデフォルトで設定
+      companyId: DEMO_COMPANY_ID,
       sidebarOpen: true,
       sidebarCollapsed: false,
       notifications: [],
       unreadCount: 0,
+      _hasHydrated: false,
 
+      setHasHydrated: (state) => set({ _hasHydrated: state }),
       setUser: (user) => set({ user }),
       setCompany: (company) => set({ company }),
       setCompanyId: (companyId) => set({ companyId }),
@@ -79,9 +85,23 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: "link-house-os-app",
+      storage: createJSONStorage(() => {
+        // SSR時はダミーストレージを返す
+        if (typeof window === "undefined") {
+          return {
+            getItem: () => null,
+            setItem: () => {},
+            removeItem: () => {},
+          };
+        }
+        return localStorage;
+      }),
       partialize: (state) => ({
         sidebarCollapsed: state.sidebarCollapsed,
       }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
   )
 );
