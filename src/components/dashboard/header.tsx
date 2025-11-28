@@ -1,6 +1,5 @@
 "use client";
 
-import { useUser, UserButton } from "@clerk/nextjs";
 import { useAppStore } from "@/stores/app-store";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,12 +16,61 @@ import {
   Building,
   HelpCircle,
   Search,
+  User,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+
+// Clerk環境変数が設定されているかチェック
+const hasClerkKeys = () => {
+  const key = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  return !!(key && key !== "pk_test_your_key_here" && key.length >= 20);
+};
+
+// Clerkコンポーネントを動的にロード（環境変数がある場合のみ）
+function ClerkUserButton() {
+  // 動的インポートでClerkを遅延ロード
+  const { UserButton } = require("@clerk/nextjs");
+  return (
+    <UserButton
+      afterSignOutUrl="/sign-in"
+      appearance={{
+        elements: {
+          avatarBox: "h-8 w-8",
+        },
+      }}
+    />
+  );
+}
+
+// フォールバックユーザーボタン
+function FallbackUserButton() {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="rounded-full">
+          <Avatar className="h-8 w-8">
+            <AvatarFallback>
+              <User className="h-4 w-4" />
+            </AvatarFallback>
+          </Avatar>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel>デモユーザー</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem>プロフィール</DropdownMenuItem>
+        <DropdownMenuItem>設定</DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem>ログアウト</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 export function Header() {
-  const { user: clerkUser } = useUser();
   const { company, notifications, unreadCount } = useAppStore();
+  const clerkEnabled = hasClerkKeys();
 
   return (
     <header className="flex h-16 items-center justify-between border-b bg-background px-6">
@@ -98,15 +146,8 @@ export function Header() {
           <HelpCircle className="h-5 w-5" />
         </Button>
 
-        {/* User menu */}
-        <UserButton
-          afterSignOutUrl="/sign-in"
-          appearance={{
-            elements: {
-              avatarBox: "h-8 w-8",
-            },
-          }}
-        />
+        {/* User menu - Clerkがある場合のみClerkUserButtonを使用 */}
+        {clerkEnabled ? <ClerkUserButton /> : <FallbackUserButton />}
       </div>
     </header>
   );

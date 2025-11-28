@@ -1,6 +1,18 @@
-import { SignIn } from "@clerk/nextjs";
+"use client";
 
-export default function SignInPage() {
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Home } from "lucide-react";
+
+// Clerk環境変数が設定されているかチェック
+const hasClerkKeys = () => {
+  const key = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  return !!(key && key !== "pk_test_your_key_here" && key.length >= 20);
+};
+
+function ClerkSignIn() {
+  const { SignIn } = require("@clerk/nextjs");
   return (
     <SignIn
       appearance={{
@@ -19,5 +31,46 @@ export default function SignInPage() {
         },
       }}
     />
+  );
+}
+
+function FallbackSignIn() {
+  return (
+    <Card className="w-full max-w-md mx-auto">
+      <CardHeader className="text-center">
+        <div className="flex justify-center mb-4">
+          <Home className="h-12 w-12 text-primary" />
+        </div>
+        <CardTitle className="text-2xl">LinK HOUSE OS</CardTitle>
+        <CardDescription>
+          デモモードで動作中
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-muted-foreground text-center">
+          Clerk認証が設定されていません。<br />
+          デモモードでダッシュボードにアクセスできます。
+        </p>
+        <Button asChild className="w-full">
+          <Link href="/dashboard">
+            ダッシュボードへ
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function SignInPage() {
+  const clerkEnabled = hasClerkKeys();
+
+  if (clerkEnabled) {
+    return <ClerkSignIn />;
+  }
+
+  return (
+    <div className="flex items-center justify-center min-h-screen p-4">
+      <FallbackSignIn />
+    </div>
   );
 }
