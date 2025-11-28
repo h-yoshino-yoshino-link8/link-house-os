@@ -94,10 +94,10 @@ CLERK_SECRET_KEY=sk_test_...
 - [x] Phase 3: 写真・工事台帳
 - [x] Phase 4: ダッシュボード・分析
 - [x] Phase 5: 課金・サブスク基盤
-- [ ] Phase 6: HOUSE DNA 完全版
-- [ ] Phase 7: 施主ポータル
-- [ ] Phase 8: ゲーミフィケーション
-- [ ] Phase 9: 外部連携
+- [x] Phase 6: HOUSE DNA 完全版
+- [x] Phase 7: 施主ポータル
+- [x] Phase 8: ゲーミフィケーション
+- [x] Phase 9: 外部連携
 
 ## ライセンス
 

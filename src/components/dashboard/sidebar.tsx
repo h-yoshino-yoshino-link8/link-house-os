@@ -35,6 +35,7 @@ import {
   Award,
   PiggyBank,
   CreditCard,
+  Plug,
 } from "lucide-react";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -52,6 +53,8 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Settings,
   PiggyBank,
   CreditCard,
+  Trophy,
+  Plug,
 };
 
 export function Sidebar() {

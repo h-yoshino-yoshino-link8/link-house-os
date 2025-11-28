@@ -155,6 +155,11 @@ export const NAVIGATION = [
     href: "/savings",
     icon: "PiggyBank",
   },
+  {
+    title: "ゲーミフィケーション",
+    href: "/gamification",
+    icon: "Trophy",
+  },
 ] as const;
 
 export const SETTINGS_NAVIGATION = [
@@ -177,6 +182,11 @@ export const SETTINGS_NAVIGATION = [
     title: "ユーザー管理",
     href: "/settings/users",
     icon: "Users",
+  },
+  {
+    title: "外部連携",
+    href: "/settings/integrations",
+    icon: "Plug",
   },
 ] as const;
 
