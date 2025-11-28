@@ -20,17 +20,40 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useState, useEffect } from "react";
 
-// Clerk環境変数が設定されているかチェック
-const hasClerkKeys = () => {
-  const key = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-  return !!(key && key !== "pk_test_your_key_here" && key.length >= 20);
-};
+// Clerk環境変数が設定されているかチェック（クライアントサイドで実行）
+function useClerkEnabled() {
+  const [enabled, setEnabled] = useState(false);
 
-// Clerkコンポーネントを動的にロード（環境変数がある場合のみ）
+  useEffect(() => {
+    const key = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+    const isEnabled = !!(key && key !== "pk_test_your_key_here" && key.length >= 20);
+    setEnabled(isEnabled);
+  }, []);
+
+  return enabled;
+}
+
+// Clerkコンポーネントを安全にロード
 function ClerkUserButton() {
-  // 動的インポートでClerkを遅延ロード
-  const { UserButton } = require("@clerk/nextjs");
+  const [UserButton, setUserButton] = useState<React.ComponentType<{ afterSignOutUrl: string; appearance: object }> | null>(null);
+
+  useEffect(() => {
+    // 動的インポートで安全にClerkをロード
+    import("@clerk/nextjs")
+      .then((module) => {
+        setUserButton(() => module.UserButton);
+      })
+      .catch((error) => {
+        console.log("Clerk not available:", error);
+      });
+  }, []);
+
+  if (!UserButton) {
+    return <FallbackUserButton />;
+  }
+
   return (
     <UserButton
       afterSignOutUrl="/sign-in"
@@ -70,7 +93,7 @@ function FallbackUserButton() {
 
 export function Header() {
   const { company, notifications, unreadCount } = useAppStore();
-  const clerkEnabled = hasClerkKeys();
+  const clerkEnabled = useClerkEnabled();
 
   return (
     <header className="flex h-16 items-center justify-between border-b bg-background px-6">
