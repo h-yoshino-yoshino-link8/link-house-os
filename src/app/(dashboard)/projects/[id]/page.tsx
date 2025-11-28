@@ -61,8 +61,7 @@ import {
   Send,
 } from "lucide-react";
 import { PROJECT_STATUS } from "@/constants";
-import { format } from "date-fns";
-import { ja } from "date-fns/locale";
+import { formatDate } from "@/lib/utils/date";
 import { useProject, useUpdateProject } from "@/hooks/use-projects";
 import { useInvoices, useCreateInvoice, useRecordPayment, Invoice } from "@/hooks/use-invoices";
 import { useAppStore, DEMO_COMPANY_ID } from "@/stores/app-store";
@@ -293,8 +292,8 @@ export default function ProjectDetailPage() {
           </CardHeader>
           <CardContent>
             <div className="text-lg font-bold">
-              {project.startDate ? format(new Date(project.startDate), "M/d", { locale: ja }) : "-"}
-              {project.endDate && ` - ${format(new Date(project.endDate), "M/d", { locale: ja })}`}
+              {project.startDate ? formatDate(project.startDate, "M/d") : "-"}
+              {project.endDate && ` - ${formatDate(project.endDate, "M/d")}`}
             </div>
             {project.endDate && (
               <p className="text-xs text-muted-foreground">
@@ -428,7 +427,7 @@ export default function ProjectDetailPage() {
                   <div>
                     <p className="font-medium">{project.estimate.title}</p>
                     <p className="text-sm text-muted-foreground">
-                      {project.estimate.estimateNumber} / 作成日: {format(new Date(project.estimate.createdAt), "yyyy/MM/dd")}
+                      {project.estimate.estimateNumber} / 作成日: {formatDate(project.estimate.createdAt)}
                     </p>
                   </div>
                   <div className="flex items-center gap-4">
@@ -484,10 +483,10 @@ export default function ProjectDetailPage() {
                         <TableCell className="font-medium">{schedule.name}</TableCell>
                         <TableCell>{schedule.assignee || "-"}</TableCell>
                         <TableCell>
-                          {schedule.startDate ? format(new Date(schedule.startDate), "M/d", { locale: ja }) : "-"}
+                          {schedule.startDate ? formatDate(schedule.startDate, "M/d") : "-"}
                         </TableCell>
                         <TableCell>
-                          {schedule.endDate ? format(new Date(schedule.endDate), "M/d", { locale: ja }) : "-"}
+                          {schedule.endDate ? formatDate(schedule.endDate, "M/d") : "-"}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -696,8 +695,8 @@ export default function ProjectDetailPage() {
                     {invoices.map((invoice) => (
                       <TableRow key={invoice.id}>
                         <TableCell className="font-mono">{invoice.invoiceNumber}</TableCell>
-                        <TableCell>{format(new Date(invoice.issueDate), "yyyy/MM/dd")}</TableCell>
-                        <TableCell>{format(new Date(invoice.dueDate), "yyyy/MM/dd")}</TableCell>
+                        <TableCell>{formatDate(invoice.issueDate)}</TableCell>
+                        <TableCell>{formatDate(invoice.dueDate)}</TableCell>
                         <TableCell className="text-right font-medium">
                           ¥{Number(invoice.total).toLocaleString()}
                         </TableCell>

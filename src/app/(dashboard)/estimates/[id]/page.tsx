@@ -59,8 +59,7 @@ import {
   Mail,
 } from "lucide-react";
 import { ESTIMATE_STATUS } from "@/constants";
-import { format } from "date-fns";
-import { ja } from "date-fns/locale";
+import { formatDate } from "@/lib/utils/date";
 import { useEstimate, useUpdateEstimate, useDeleteEstimate, useConfirmOrder } from "@/hooks/use-estimates";
 import { useEstimateStore } from "@/stores/estimate-store";
 import { PDFDownloadButton } from "@/components/estimates/pdf-download-button";
@@ -165,7 +164,7 @@ export default function EstimateDetailPage() {
       `ご依頼いただきました「${estimate.title}」の御見積書をお送りいたします。\n\n` +
       `■ 見積番号: ${estimate.estimateNumber}\n` +
       `■ 御見積金額: ¥${Number(estimate.total).toLocaleString()}（税込）\n` +
-      `■ 有効期限: ${estimate.validUntil ? format(new Date(estimate.validUntil), "yyyy年M月d日") : "なし"}\n\n` +
+      `■ 有効期限: ${estimate.validUntil ? formatDate(estimate.validUntil, "yyyy年M月d日") : "なし"}\n\n` +
       `ご不明な点がございましたら、お気軽にお問い合わせください。\n\n` +
       `何卒よろしくお願い申し上げます。`
     );
@@ -492,12 +491,12 @@ export default function EstimateDetailPage() {
           <CardContent className="space-y-2 text-sm">
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">見積日</span>
-              <span>{format(new Date(estimate.estimateDate), "yyyy/MM/dd", { locale: ja })}</span>
+              <span>{formatDate(estimate.estimateDate)}</span>
             </div>
             {estimate.validUntil && (
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">有効期限</span>
-                <span>{format(new Date(estimate.validUntil), "yyyy/MM/dd", { locale: ja })}</span>
+                <span>{formatDate(estimate.validUntil)}</span>
               </div>
             )}
             <div className="flex items-center justify-between">
@@ -662,7 +661,7 @@ export default function EstimateDetailPage() {
               )}
             </div>
             <p className="text-xs text-muted-foreground">
-              作成: {estimate.createdBy?.name || "-"} / 最終更新: {format(new Date(estimate.updatedAt), "yyyy/MM/dd HH:mm", { locale: ja })}
+              作成: {estimate.createdBy?.name || "-"} / 最終更新: {formatDate(estimate.updatedAt, "yyyy/MM/dd HH:mm")}
             </p>
           </div>
         </CardContent>

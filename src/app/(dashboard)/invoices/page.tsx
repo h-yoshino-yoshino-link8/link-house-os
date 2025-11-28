@@ -30,7 +30,7 @@ import {
   AlertCircle,
   CheckCircle2,
 } from "lucide-react";
-import { format } from "date-fns";
+import { formatDate } from "@/lib/utils/date";
 import { useInvoices } from "@/hooks/use-invoices";
 import { useAppStore, DEMO_COMPANY_ID } from "@/stores/app-store";
 import { useState } from "react";
@@ -224,9 +224,9 @@ export default function InvoicesPage() {
                           "-"
                         )}
                       </TableCell>
-                      <TableCell>{format(new Date(invoice.issueDate), "yyyy/MM/dd")}</TableCell>
+                      <TableCell>{formatDate(invoice.issueDate)}</TableCell>
                       <TableCell className={isOverdue ? "text-red-600" : ""}>
-                        {format(new Date(invoice.dueDate), "yyyy/MM/dd")}
+                        {formatDate(invoice.dueDate)}
                         {isOverdue && <AlertCircle className="inline ml-1 h-3 w-3" />}
                       </TableCell>
                       <TableCell className="text-right font-medium">

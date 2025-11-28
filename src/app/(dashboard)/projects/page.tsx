@@ -58,8 +58,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { PROJECT_STATUS } from "@/constants";
-import { format } from "date-fns";
-import { ja } from "date-fns/locale";
+import { formatDate } from "@/lib/utils/date";
 import { useProjects, useDeleteProject } from "@/hooks/use-projects";
 import { useAppStore, DEMO_COMPANY_ID } from "@/stores/app-store";
 import type { Project } from "@/lib/api/types";
@@ -460,7 +459,7 @@ export default function ProjectsPage() {
                           {project.startDate && project.endDate ? (
                             <div className="flex items-center gap-1">
                               <Calendar className="h-3 w-3 text-muted-foreground" />
-                              {format(new Date(project.startDate), "M/d", { locale: ja })} - {format(new Date(project.endDate), "M/d", { locale: ja })}
+                              {formatDate(project.startDate, "M/d")} - {formatDate(project.endDate, "M/d")}
                             </div>
                           ) : (
                             <span className="text-muted-foreground">未定</span>

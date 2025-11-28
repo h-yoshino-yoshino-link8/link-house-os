@@ -53,7 +53,7 @@ import {
   ZoomIn,
   Loader2,
 } from "lucide-react";
-import { format } from "date-fns";
+import { formatDate } from "@/lib/utils/date";
 import { usePhotos, useDeletePhotos } from "@/hooks/use-photos";
 import { useProjects } from "@/hooks/use-projects";
 import { useAppStore, DEMO_COMPANY_ID } from "@/stores/app-store";
@@ -421,7 +421,7 @@ export default function PhotosPage() {
                   <p className="text-xs text-muted-foreground truncate">{photo.projectName}</p>
                   {photo.takenAt && (
                     <p className="text-xs text-muted-foreground">
-                      {format(new Date(photo.takenAt), "yyyy/MM/dd")}
+                      {formatDate(photo.takenAt)}
                     </p>
                   )}
                 </CardContent>
@@ -484,7 +484,7 @@ export default function PhotosPage() {
                         )}
                       </td>
                       <td className="p-3 text-sm">
-                        {photo.takenAt && format(new Date(photo.takenAt), "yyyy/MM/dd")}
+                        {photo.takenAt && formatDate(photo.takenAt)}
                       </td>
                       <td className="p-3">
                         <DropdownMenu>
@@ -623,7 +623,7 @@ export default function PhotosPage() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">撮影日</span>
-                      <span>{selectedPhoto?.takenAt && format(new Date(selectedPhoto.takenAt), "yyyy/MM/dd")}</span>
+                      <span>{selectedPhoto?.takenAt && formatDate(selectedPhoto.takenAt)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">カテゴリ</span>

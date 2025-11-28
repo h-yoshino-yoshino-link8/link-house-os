@@ -53,8 +53,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { CUSTOMER_RANK, PROJECT_STATUS, ESTIMATE_STATUS, SAVINGS_PLANS } from "@/constants";
-import { format } from "date-fns";
-import { ja } from "date-fns/locale";
+import { formatDate } from "@/lib/utils/date";
 import { useCustomer } from "@/hooks/use-customers";
 
 const rankIcons: Record<string, React.ReactNode> = {
@@ -146,7 +145,7 @@ export default function CustomerDetailPage() {
                 </Badge>
               </div>
               <p className="text-muted-foreground">
-                {customer.type === "corporate" ? "法人" : "個人"} / 登録: {format(new Date(customer.createdAt), "yyyy年M月", { locale: ja })}
+                {customer.type === "corporate" ? "法人" : "個人"} / 登録: {formatDate(customer.createdAt, "yyyy年M月")}
               </p>
               <div className="flex items-center gap-2 mt-1">
                 {customer.tags?.map((tag) => (
@@ -186,7 +185,7 @@ export default function CustomerDetailPage() {
           <CardContent>
             <div className="text-2xl font-bold">¥{totalTransaction.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              最終更新: {format(new Date(customer.updatedAt), "yyyy/M/d")}
+              最終更新: {formatDate(customer.updatedAt, "yyyy/M/d")}
             </p>
           </CardContent>
         </Card>
@@ -451,7 +450,7 @@ export default function CustomerDetailPage() {
                             {ESTIMATE_STATUS[estimate.status as keyof typeof ESTIMATE_STATUS]?.label}
                           </Badge>
                         </TableCell>
-                        <TableCell>{format(new Date(estimate.createdAt), "yyyy/M/d")}</TableCell>
+                        <TableCell>{formatDate(estimate.createdAt, "yyyy/M/d")}</TableCell>
                         <TableCell className="text-right">¥{Number(estimate.total).toLocaleString()}</TableCell>
                         <TableCell>
                           <Button variant="ghost" size="sm" asChild>
@@ -505,9 +504,9 @@ export default function CustomerDetailPage() {
                         </TableCell>
                         <TableCell>
                           {project.startDate
-                            ? format(new Date(project.startDate), "yyyy/M/d")
+                            ? formatDate(project.startDate, "yyyy/M/d")
                             : "-"}
-                          {project.endDate && ` 〜 ${format(new Date(project.endDate), "M/d")}`}
+                          {project.endDate && ` 〜 ${formatDate(project.endDate, "M/d")}`}
                         </TableCell>
                         <TableCell className="text-right">
                           {project.contractAmount
@@ -564,7 +563,7 @@ export default function CustomerDetailPage() {
                   <TableBody>
                     {customer.pointTransactions?.map((transaction) => (
                       <TableRow key={transaction.id}>
-                        <TableCell>{format(new Date(transaction.createdAt), "yyyy/M/d")}</TableCell>
+                        <TableCell>{formatDate(transaction.createdAt, "yyyy/M/d")}</TableCell>
                         <TableCell>{transaction.description || transaction.type}</TableCell>
                         <TableCell className={`text-right font-medium ${
                           transaction.points > 0 ? "text-green-600" : "text-red-600"

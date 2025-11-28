@@ -39,8 +39,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { ESTIMATE_STATUS } from "@/constants";
-import { format } from "date-fns";
-import { ja } from "date-fns/locale";
+import { formatDate } from "@/lib/utils/date";
 import { useEstimates, useDeleteEstimate } from "@/hooks/use-estimates";
 import { useAppStore, DEMO_COMPANY_ID } from "@/stores/app-store";
 import type { Estimate } from "@/lib/api/types";
@@ -289,7 +288,7 @@ export default function EstimatesPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {format(new Date(estimate.estimateDate), "yyyy/MM/dd", { locale: ja })}
+                        {formatDate(estimate.estimateDate)}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>

@@ -36,7 +36,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { STRUCTURE_TYPES, COMPONENT_CATEGORIES } from "@/constants";
-import { format } from "date-fns";
+import { formatDate } from "@/lib/utils/date";
 import {
   RadarChart,
   PolarGrid,
@@ -471,7 +471,7 @@ export default function HouseDetailPage() {
                           </TableCell>
                           <TableCell>
                             {component.installedDate
-                              ? format(new Date(component.installedDate), "yyyy/M/d")
+                              ? formatDate(component.installedDate, "yyyy/M/d")
                               : "-"}
                           </TableCell>
                           <TableCell>
@@ -483,7 +483,7 @@ export default function HouseDetailPage() {
                                     : ""
                                 }
                               >
-                                {format(new Date(component.warrantyExpires), "yyyy/M/d")}
+                                {formatDate(component.warrantyExpires, "yyyy/M/d")}
                               </span>
                             ) : (
                               "-"
@@ -553,7 +553,7 @@ export default function HouseDetailPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {project.endDate ? format(new Date(project.endDate), "yyyy/M/d") : "-"}
+                          {project.endDate ? formatDate(project.endDate, "yyyy/M/d") : "-"}
                         </TableCell>
                         <TableCell className="text-right">
                           {project.contractAmount
@@ -607,7 +607,7 @@ export default function HouseDetailPage() {
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          施工日: {format(new Date(cert.workDate), "yyyy/M/d")}
+                          施工日: {formatDate(cert.workDate, "yyyy/M/d")}
                         </p>
                         <p className="text-sm text-muted-foreground">
                           施工業者: {cert.contractorName}
