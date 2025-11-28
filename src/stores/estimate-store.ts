@@ -40,9 +40,30 @@ interface EstimateState {
   updateDetail: (id: string, detail: Partial<EstimateDetailState>) => void;
   removeDetail: (id: string) => void;
   reorderDetails: (details: EstimateDetailState[]) => void;
+  clearDetails: () => void;
 
   setGlobalProfitRate: (rate: number) => void;
   applyGlobalProfitRate: () => void;
+
+  // 見積コピー用
+  loadFromEstimate: (data: {
+    customerId: string;
+    houseId?: string | null;
+    title: string;
+    notes?: string | null;
+    internalMemo?: string | null;
+    taxRate: number;
+    details: Array<{
+      name: string;
+      specification?: string | null;
+      quantity: number;
+      unit?: string | null;
+      costMaterial: number;
+      costLabor: number;
+      profitRate: number;
+      internalMemo?: string | null;
+    }>;
+  }) => void;
 
   recalculate: () => void;
   reset: () => void;
@@ -221,6 +242,11 @@ export const useEstimateStore = create<EstimateState>()((set, get) => ({
     });
   },
 
+  clearDetails: () => {
+    set({ details: [] });
+    get().recalculate();
+  },
+
   setGlobalProfitRate: (rate) => set({ globalProfitRate: rate }),
 
   applyGlobalProfitRate: () => {
@@ -259,6 +285,39 @@ export const useEstimateStore = create<EstimateState>()((set, get) => ({
       profit,
       profitRate,
     });
+  },
+
+  loadFromEstimate: (data) => {
+    const state = get();
+
+    // 基本情報をセット
+    set({
+      customerId: data.customerId,
+      houseId: data.houseId || null,
+      title: data.title + "（コピー）",
+      notes: data.notes || "",
+      internalMemo: data.internalMemo || "",
+      taxRate: data.taxRate,
+      estimateDate: new Date(),
+      validUntil: null,
+      details: [],
+    });
+
+    // 明細を追加
+    data.details.forEach((d) => {
+      get().addDetail({
+        name: d.name,
+        specification: d.specification || "",
+        quantity: d.quantity,
+        unit: d.unit || "式",
+        costMaterial: d.costMaterial,
+        costLabor: d.costLabor,
+        profitRate: d.profitRate,
+        internalMemo: d.internalMemo || "",
+      });
+    });
+
+    get().recalculate();
   },
 
   reset: () => set(initialState),

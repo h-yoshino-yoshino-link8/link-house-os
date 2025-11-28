@@ -80,8 +80,11 @@ export function useCreateEstimate() {
 
 // 見積更新
 interface UpdateEstimateData {
+  customerId?: string;
+  houseId?: string | null;
   title?: string;
   status?: string;
+  estimateDate?: string;
   validUntil?: string | null;
   taxRate?: number;
   notes?: string;

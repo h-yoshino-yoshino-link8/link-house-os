@@ -7,6 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -30,6 +33,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   ArrowLeft,
   User,
   Home,
@@ -45,11 +56,13 @@ import {
   CheckCircle2,
   Loader2,
   ExternalLink,
+  Mail,
 } from "lucide-react";
 import { ESTIMATE_STATUS } from "@/constants";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
 import { useEstimate, useUpdateEstimate, useDeleteEstimate } from "@/hooks/use-estimates";
+import { useEstimateStore } from "@/stores/estimate-store";
 import { PDFDownloadButton } from "@/components/estimates/pdf-download-button";
 import { toast } from "sonner";
 
@@ -65,6 +78,13 @@ export default function EstimateDetailPage() {
   const params = useParams();
   const router = useRouter();
   const estimateId = params.id as string;
+  const estimateStore = useEstimateStore();
+
+  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+  const [emailTo, setEmailTo] = useState("");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
 
   const { data, isLoading, isError } = useEstimate(estimateId);
   const estimate = data?.data;
@@ -88,6 +108,90 @@ export default function EstimateDetailPage() {
       router.push("/estimates");
     } catch {
       toast.error("削除に失敗しました");
+    }
+  };
+
+  // コピーして作成
+  const handleCopy = () => {
+    if (!estimate) return;
+
+    interface EstimateDetailFromAPI {
+      id: string;
+      name: string;
+      specification?: string | null;
+      quantity: number;
+      unit?: string | null;
+      costMaterial: number | string;
+      costLabor: number | string;
+      profitRate: number | string;
+      internalMemo?: string | null;
+    }
+
+    const details = (estimate.details || []) as EstimateDetailFromAPI[];
+
+    estimateStore.loadFromEstimate({
+      customerId: estimate.customerId,
+      houseId: estimate.houseId,
+      title: estimate.title,
+      notes: estimate.notes,
+      internalMemo: estimate.internalMemo,
+      taxRate: estimate.taxRate,
+      details: details.map((d) => ({
+        name: d.name,
+        specification: d.specification,
+        quantity: Number(d.quantity),
+        unit: d.unit,
+        costMaterial: Number(d.costMaterial),
+        costLabor: Number(d.costLabor),
+        profitRate: Number(d.profitRate),
+        internalMemo: d.internalMemo,
+      })),
+    });
+
+    toast.success("見積データをコピーしました");
+    router.push("/estimates/new");
+  };
+
+  // メール送信ダイアログを開く
+  const openEmailDialog = () => {
+    if (!estimate) return;
+
+    setEmailTo(estimate.customer?.email || "");
+    setEmailSubject(`【御見積書】${estimate.title} - ${estimate.estimateNumber}`);
+    setEmailBody(
+      `${estimate.customer?.name || "お客"} 様\n\n` +
+      `いつもお世話になっております。\n\n` +
+      `ご依頼いただきました「${estimate.title}」の御見積書をお送りいたします。\n\n` +
+      `■ 見積番号: ${estimate.estimateNumber}\n` +
+      `■ 御見積金額: ¥${Number(estimate.total).toLocaleString()}（税込）\n` +
+      `■ 有効期限: ${estimate.validUntil ? format(new Date(estimate.validUntil), "yyyy年M月d日") : "なし"}\n\n` +
+      `ご不明な点がございましたら、お気軽にお問い合わせください。\n\n` +
+      `何卒よろしくお願い申し上げます。`
+    );
+    setIsEmailDialogOpen(true);
+  };
+
+  // メール送信（実際の実装ではAPIを呼び出す）
+  const handleSendEmail = async () => {
+    if (!emailTo) {
+      toast.error("送信先メールアドレスを入力してください");
+      return;
+    }
+
+    setIsSendingEmail(true);
+    try {
+      // TODO: 実際のメール送信API実装
+      // await fetch("/api/send-email", { ... });
+
+      // デモ用：成功として扱う
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      toast.success("メールを送信しました（デモ）");
+      setIsEmailDialogOpen(false);
+    } catch {
+      toast.error("メール送信に失敗しました");
+    } finally {
+      setIsSendingEmail(false);
     }
   };
 
@@ -172,6 +276,9 @@ export default function EstimateDetailPage() {
               taxRate: estimate.taxRate,
               tax,
               total,
+              costTotal,
+              profit,
+              profitRate,
               notes: estimate.notes,
               customer: estimate.customer,
               details: details.map((d) => ({
@@ -180,6 +287,10 @@ export default function EstimateDetailPage() {
                 specification: d.specification,
                 quantity: d.quantity,
                 unit: d.unit,
+                costMaterial: Number(d.costMaterial),
+                costLabor: Number(d.costLabor),
+                costTotal: Number(d.costTotal),
+                profitRate: Number(d.profitRate),
                 priceUnit: Number(d.priceUnit),
                 priceTotal: Number(d.priceTotal),
               })),
@@ -208,11 +319,11 @@ export default function EstimateDetailPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={handleCopy}>
                 <Copy className="mr-2 h-4 w-4" />
                 コピーして作成
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={openEmailDialog}>
                 <Send className="mr-2 h-4 w-4" />
                 メール送信
               </DropdownMenuItem>
@@ -538,6 +649,60 @@ export default function EstimateDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Email Dialog */}
+      <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              見積書をメール送信
+            </DialogTitle>
+            <DialogDescription>
+              見積書をPDF添付してメールを送信します
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>送信先メールアドレス *</Label>
+              <Input
+                type="email"
+                value={emailTo}
+                onChange={(e) => setEmailTo(e.target.value)}
+                placeholder="customer@example.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>件名</Label>
+              <Input
+                value={emailSubject}
+                onChange={(e) => setEmailSubject(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>本文</Label>
+              <Textarea
+                value={emailBody}
+                onChange={(e) => setEmailBody(e.target.value)}
+                rows={10}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEmailDialogOpen(false)}>
+              キャンセル
+            </Button>
+            <Button onClick={handleSendEmail} disabled={isSendingEmail}>
+              {isSendingEmail ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="mr-2 h-4 w-4" />
+              )}
+              送信
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
