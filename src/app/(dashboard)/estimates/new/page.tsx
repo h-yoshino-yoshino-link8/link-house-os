@@ -222,10 +222,24 @@ export default function NewEstimatePage() {
   // 見積作成ミューテーション
   const createEstimate = useCreateEstimate();
 
+  // 見積日から1ヶ月後を計算
+  const calcValidUntil = (dateStr: string) => {
+    const date = new Date(dateStr);
+    date.setMonth(date.getMonth() + 1);
+    return date.toISOString().split("T")[0];
+  };
+
   // フォーム状態
-  const [estimateDate, setEstimateDate] = useState(new Date().toISOString().split("T")[0]);
-  const [validUntil, setValidUntil] = useState("");
+  const today = new Date().toISOString().split("T")[0];
+  const [estimateDate, setEstimateDate] = useState(today);
+  const [validUntil, setValidUntil] = useState(calcValidUntil(today));
   const [isSaving, setIsSaving] = useState(false);
+
+  // 見積日が変更されたら有効期限を自動更新
+  const handleEstimateDateChange = (newDate: string) => {
+    setEstimateDate(newDate);
+    setValidUntil(calcValidUntil(newDate));
+  };
 
   // 初期化時にURLパラメータから顧客を設定
   useEffect(() => {
@@ -529,11 +543,11 @@ export default function NewEstimatePage() {
                 <Input
                   type="date"
                   value={estimateDate}
-                  onChange={(e) => setEstimateDate(e.target.value)}
+                  onChange={(e) => handleEstimateDateChange(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
-                <Label>有効期限</Label>
+                <Label>有効期限（見積日+1ヶ月）</Label>
                 <Input
                   type="date"
                   value={validUntil}
