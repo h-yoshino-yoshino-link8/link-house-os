@@ -1,7 +1,18 @@
-import { clerkMiddleware } from "@clerk/nextjs/server";
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-// 認証ミドルウェア（認証チェックなし - 全ページ公開）
-export default clerkMiddleware();
+// 公開ルート（認証不要）
+const isPublicRoute = createRouteMatcher([
+  "/sign-in(.*)",
+  "/sign-up(.*)",
+  "/api/webhooks(.*)",
+]);
+
+export default clerkMiddleware(async (auth, request) => {
+  // 公開ルート以外は認証必須
+  if (!isPublicRoute(request)) {
+    await auth.protect();
+  }
+});
 
 export const config = {
   matcher: [
