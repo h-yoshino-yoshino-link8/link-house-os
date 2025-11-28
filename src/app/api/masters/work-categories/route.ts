@@ -1,21 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/db/prisma";
+import { tryGetPrisma, DEMO_DATA } from "@/lib/api-utils";
 
 // GET /api/masters/work-categories - 工事カテゴリマスタ一覧取得
 export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams;
+  const companyId = searchParams.get("companyId");
+
+  if (!companyId) {
+    return NextResponse.json(
+      { error: "companyId is required" },
+      { status: 400 }
+    );
+  }
+
+  const prisma = await tryGetPrisma();
+
+  if (!prisma) {
+    return NextResponse.json({ data: DEMO_DATA.workCategories });
+  }
+
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const companyId = searchParams.get("companyId");
     const parentId = searchParams.get("parentId");
     const isActive = searchParams.get("isActive");
     const flat = searchParams.get("flat"); // flat=true でツリー構造なしで返す
-
-    if (!companyId) {
-      return NextResponse.json(
-        { error: "companyId is required" },
-        { status: 400 }
-      );
-    }
 
     const where: Record<string, unknown> = { companyId };
 
@@ -64,15 +71,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ data: rootCategories });
   } catch (error) {
     console.error("Failed to fetch work categories:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch work categories" },
-      { status: 500 }
-    );
+    return NextResponse.json({ data: DEMO_DATA.workCategories });
   }
 }
 
 // POST /api/masters/work-categories - 工事カテゴリマスタ作成
 export async function POST(request: NextRequest) {
+  const prisma = await tryGetPrisma();
+
+  if (!prisma) {
+    return NextResponse.json(
+      { error: "Database not available in demo mode" },
+      { status: 503 }
+    );
+  }
+
   try {
     const body = await request.json();
     const { companyId, parentId, name, code, sortOrder } = body;

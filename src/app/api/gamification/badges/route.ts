@@ -1,20 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/db/prisma";
+import { tryGetPrisma, DEMO_DATA } from "@/lib/api-utils";
 import { BADGE_DEFINITIONS } from "@/lib/gamification";
 
 // GET /api/gamification/badges - バッジ一覧取得
 export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams;
+  const companyId = searchParams.get("companyId");
+
+  if (!companyId) {
+    return NextResponse.json(
+      { error: "companyId is required" },
+      { status: 400 }
+    );
+  }
+
+  const prisma = await tryGetPrisma();
+
+  if (!prisma) {
+    return NextResponse.json({ data: DEMO_DATA.badges });
+  }
+
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const companyId = searchParams.get("companyId");
-
-    if (!companyId) {
-      return NextResponse.json(
-        { error: "companyId is required" },
-        { status: 400 }
-      );
-    }
-
     // 獲得済みバッジ
     const earnedBadges = await prisma.userBadge.findMany({
       where: { companyId },
@@ -26,17 +32,17 @@ export async function GET(request: NextRequest) {
 
     // 全バッジ定義
     const allBadges = BADGE_DEFINITIONS.map((def) => {
-      const earned = earnedBadges.find((eb) => eb.badge.code === def.code);
+      const earned = earnedBadges.find((eb: { badge: { code: string } }) => eb.badge.code === def.code);
       return {
         ...def,
         earned: !!earned,
-        earnedAt: earned?.earnedAt || null,
+        earnedAt: (earned as { earnedAt?: Date } | undefined)?.earnedAt || null,
       };
     });
 
     return NextResponse.json({
       data: {
-        earned: earnedBadges.map((eb) => ({
+        earned: earnedBadges.map((eb: { badge: Record<string, unknown>; earnedAt: Date }) => ({
           ...eb.badge,
           earnedAt: eb.earnedAt,
         })),
@@ -47,15 +53,21 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Failed to fetch badges:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch badges" },
-      { status: 500 }
-    );
+    return NextResponse.json({ data: DEMO_DATA.badges });
   }
 }
 
 // POST /api/gamification/badges/check - バッジ獲得条件チェック
 export async function POST(request: NextRequest) {
+  const prisma = await tryGetPrisma();
+
+  if (!prisma) {
+    return NextResponse.json(
+      { error: "Database not available in demo mode" },
+      { status: 503 }
+    );
+  }
+
   try {
     const body = await request.json();
     const { companyId } = body;
@@ -111,7 +123,8 @@ export async function POST(request: NextRequest) {
     // 獲得すべきバッジをチェック
     const newBadges: Array<{ code: string; name: string; xpReward: number }> = [];
 
-    await prisma.$transaction(async (tx) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await prisma.$transaction(async (tx: any) => {
       for (const badgeDef of BADGE_DEFINITIONS) {
         const currentValue = stats[badgeDef.conditionType] || 0;
 

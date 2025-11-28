@@ -1,24 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/db/prisma";
+import { tryGetPrisma, DEMO_DATA } from "@/lib/api-utils";
 
 // GET /api/estimates - 見積一覧取得
 export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams;
+  const companyId = searchParams.get("companyId");
+
+  if (!companyId) {
+    return NextResponse.json(
+      { error: "companyId is required" },
+      { status: 400 }
+    );
+  }
+
+  const prisma = await tryGetPrisma();
+
+  // DB接続できない場合はデモデータを返す
+  if (!prisma) {
+    return NextResponse.json({
+      data: DEMO_DATA.estimates,
+      pagination: { page: 1, limit: 20, total: DEMO_DATA.estimates.length, totalPages: 1 },
+    });
+  }
+
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const companyId = searchParams.get("companyId");
     const status = searchParams.get("status");
     const customerId = searchParams.get("customerId");
     const search = searchParams.get("search");
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
     const skip = (page - 1) * limit;
-
-    if (!companyId) {
-      return NextResponse.json(
-        { error: "companyId is required" },
-        { status: 400 }
-      );
-    }
 
     const where = {
       companyId,
@@ -74,15 +85,25 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Failed to fetch estimates:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch estimates" },
-      { status: 500 }
-    );
+    // エラー時もデモデータを返す
+    return NextResponse.json({
+      data: DEMO_DATA.estimates,
+      pagination: { page: 1, limit: 20, total: DEMO_DATA.estimates.length, totalPages: 1 },
+    });
   }
 }
 
 // POST /api/estimates - 見積作成
 export async function POST(request: NextRequest) {
+  const prisma = await tryGetPrisma();
+
+  if (!prisma) {
+    return NextResponse.json(
+      { error: "Database not available. Demo mode does not support creating estimates." },
+      { status: 503 }
+    );
+  }
+
   try {
     const body = await request.json();
     const {

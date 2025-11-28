@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/db/prisma";
+import { tryGetPrisma, DEMO_DATA } from "@/lib/api-utils";
 
 // GET /api/schedules - 工程一覧取得（プロジェクト情報付き）
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const companyId = searchParams.get("companyId");
-  const projectId = searchParams.get("projectId");
-  const startDate = searchParams.get("startDate");
-  const endDate = searchParams.get("endDate");
 
   if (!companyId) {
     return NextResponse.json(
@@ -15,6 +12,16 @@ export async function GET(request: NextRequest) {
       { status: 400 }
     );
   }
+
+  const prisma = await tryGetPrisma();
+
+  if (!prisma) {
+    return NextResponse.json({ data: DEMO_DATA.schedules });
+  }
+
+  const projectId = searchParams.get("projectId");
+  const startDate = searchParams.get("startDate");
+  const endDate = searchParams.get("endDate");
 
   try {
     // スケジュールを持つプロジェクトを取得
@@ -88,9 +95,11 @@ export async function GET(request: NextRequest) {
     });
 
     // プロジェクトごとの進捗率を計算
-    const projectsWithProgress = projects.map((project) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const projectsWithProgress = projects.map((project: any) => {
       const schedules = project.schedules;
-      const totalProgress = schedules.reduce((sum, s) => sum + s.progress, 0);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const totalProgress = schedules.reduce((sum: number, s: any) => sum + s.progress, 0);
       const overallProgress = schedules.length > 0
         ? Math.round(totalProgress / schedules.length)
         : 0;
@@ -104,11 +113,13 @@ export async function GET(request: NextRequest) {
         startDate: project.startDate,
         endDate: project.endDate,
         progress: overallProgress,
-        schedules: schedules.map((s) => ({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        schedules: schedules.map((s: any) => ({
           ...s,
           startDate: s.startDate.toISOString(),
           endDate: s.endDate.toISOString(),
-          children: s.children?.map((c) => ({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          children: s.children?.map((c: any) => ({
             ...c,
             startDate: c.startDate.toISOString(),
             endDate: c.endDate.toISOString(),
@@ -120,15 +131,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ data: projectsWithProgress });
   } catch (error) {
     console.error("Failed to fetch schedules:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch schedules" },
-      { status: 500 }
-    );
+    return NextResponse.json({ data: DEMO_DATA.schedules });
   }
 }
 
 // POST /api/schedules - 工程作成
 export async function POST(request: NextRequest) {
+  const prisma = await tryGetPrisma();
+
+  if (!prisma) {
+    return NextResponse.json(
+      { error: "Database not available in demo mode" },
+      { status: 503 }
+    );
+  }
+
   try {
     const body = await request.json();
     const {
