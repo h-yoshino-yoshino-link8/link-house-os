@@ -151,6 +151,11 @@ export const NAVIGATION = [
     icon: "BarChart3",
   },
   {
+    title: "請求管理",
+    href: "/invoices",
+    icon: "Receipt",
+  },
+  {
     title: "積立管理",
     href: "/savings",
     icon: "PiggyBank",

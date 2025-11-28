@@ -25,6 +25,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
   ArrowLeft,
   Calendar,
   User,
@@ -45,11 +56,17 @@ import {
   Phone,
   Mail,
   Loader2,
+  Receipt,
+  CreditCard,
+  Send,
 } from "lucide-react";
 import { PROJECT_STATUS } from "@/constants";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
-import { useProject } from "@/hooks/use-projects";
+import { useProject, useUpdateProject } from "@/hooks/use-projects";
+import { useInvoices, useCreateInvoice, useRecordPayment, Invoice } from "@/hooks/use-invoices";
+import { useAppStore, DEMO_COMPANY_ID } from "@/stores/app-store";
+import { toast } from "sonner";
 
 const statusIcons: Record<string, React.ReactNode> = {
   planning: <CircleDot className="h-4 w-4 text-gray-500" />,
@@ -72,9 +89,81 @@ const statusColors: Record<string, string> = {
 export default function ProjectDetailPage() {
   const params = useParams();
   const projectId = params.id as string;
+  const companyId = useAppStore((state) => state.companyId) || DEMO_COMPANY_ID;
 
   const { data, isLoading, isError } = useProject(projectId);
   const project = data?.data;
+
+  // 請求書データ取得
+  const { data: invoicesData } = useInvoices({
+    companyId,
+    projectId,
+  });
+  const invoices = invoicesData?.data ?? [];
+
+  // 請求書作成
+  const createInvoice = useCreateInvoice();
+  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
+  const [invoiceTitle, setInvoiceTitle] = useState("");
+  const [invoiceDueDate, setInvoiceDueDate] = useState("");
+
+  // 入金記録
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
+  const [paymentMethod, setPaymentMethod] = useState("bank_transfer");
+  const recordPayment = useRecordPayment(selectedInvoiceId || "");
+
+  const handleCreateInvoice = async () => {
+    if (!project) return;
+    try {
+      const contractAmount = Number(project.contractAmount || 0);
+      await createInvoice.mutateAsync({
+        companyId,
+        projectId,
+        customerId: project.customerId,
+        title: invoiceTitle || project.title,
+        issueDate: new Date().toISOString(),
+        dueDate: invoiceDueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        taxRate: 10,
+        details: [{
+          name: project.title,
+          quantity: 1,
+          unitPrice: contractAmount,
+        }],
+      });
+      toast.success("請求書を作成しました");
+      setInvoiceDialogOpen(false);
+      setInvoiceTitle("");
+      setInvoiceDueDate("");
+    } catch {
+      toast.error("請求書の作成に失敗しました");
+    }
+  };
+
+  const handleRecordPayment = async () => {
+    if (!selectedInvoiceId) return;
+    try {
+      await recordPayment.mutateAsync({
+        paymentDate,
+        amount: parseFloat(paymentAmount),
+        method: paymentMethod,
+      });
+      toast.success("入金を記録しました");
+      setPaymentDialogOpen(false);
+      setSelectedInvoiceId(null);
+      setPaymentAmount("");
+    } catch {
+      toast.error("入金記録に失敗しました");
+    }
+  };
+
+  const openPaymentDialog = (invoice: Invoice) => {
+    setSelectedInvoiceId(invoice.id);
+    setPaymentAmount(String(Number(invoice.remainingAmount)));
+    setPaymentDialogOpen(true);
+  };
 
   if (isLoading) {
     return (
@@ -236,6 +325,7 @@ export default function ProjectDetailPage() {
           <TabsTrigger value="overview">概要</TabsTrigger>
           <TabsTrigger value="schedule">工程</TabsTrigger>
           <TabsTrigger value="costs">原価</TabsTrigger>
+          <TabsTrigger value="invoices">請求</TabsTrigger>
           <TabsTrigger value="photos">写真</TabsTrigger>
           <TabsTrigger value="documents">書類</TabsTrigger>
         </TabsList>
@@ -487,6 +577,228 @@ export default function ProjectDetailPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Invoices Tab */}
+        <TabsContent value="invoices" className="space-y-4">
+          {/* Invoice Summary */}
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">請求総額</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  ¥{invoices.reduce((sum, inv) => sum + Number(inv.total), 0).toLocaleString()}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">入金済</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">
+                  ¥{invoices.reduce((sum, inv) => sum + Number(inv.paidAmount), 0).toLocaleString()}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">未入金</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-orange-600">
+                  ¥{invoices.reduce((sum, inv) => sum + Number(inv.remainingAmount), 0).toLocaleString()}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Receipt className="h-5 w-5" />
+                  請求書一覧
+                </CardTitle>
+                <Dialog open={invoiceDialogOpen} onOpenChange={setInvoiceDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="mr-2 h-4 w-4" />
+                      請求書発行
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>請求書発行</DialogTitle>
+                      <DialogDescription>この案件の請求書を作成します</DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="space-y-2">
+                        <Label>請求書タイトル</Label>
+                        <Input
+                          placeholder={project.title}
+                          value={invoiceTitle}
+                          onChange={(e) => setInvoiceTitle(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>請求金額</Label>
+                        <div className="text-lg font-bold">
+                          ¥{contractAmount.toLocaleString()}（税込: ¥{Math.round(contractAmount * 1.1).toLocaleString()}）
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>支払期限</Label>
+                        <Input
+                          type="date"
+                          value={invoiceDueDate}
+                          onChange={(e) => setInvoiceDueDate(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setInvoiceDialogOpen(false)}>
+                        キャンセル
+                      </Button>
+                      <Button onClick={handleCreateInvoice} disabled={createInvoice.isPending}>
+                        {createInvoice.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        <Send className="mr-2 h-4 w-4" />
+                        発行する
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {invoices.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                  <Receipt className="h-12 w-12 mb-2" />
+                  <p>請求書がまだ発行されていません</p>
+                  <p className="text-sm">「請求書発行」から作成できます</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>請求番号</TableHead>
+                      <TableHead>発行日</TableHead>
+                      <TableHead>支払期限</TableHead>
+                      <TableHead className="text-right">請求額</TableHead>
+                      <TableHead className="text-right">入金済</TableHead>
+                      <TableHead>ステータス</TableHead>
+                      <TableHead></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {invoices.map((invoice) => (
+                      <TableRow key={invoice.id}>
+                        <TableCell className="font-mono">{invoice.invoiceNumber}</TableCell>
+                        <TableCell>{format(new Date(invoice.issueDate), "yyyy/MM/dd")}</TableCell>
+                        <TableCell>{format(new Date(invoice.dueDate), "yyyy/MM/dd")}</TableCell>
+                        <TableCell className="text-right font-medium">
+                          ¥{Number(invoice.total).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right text-green-600">
+                          ¥{Number(invoice.paidAmount).toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              invoice.status === "paid"
+                                ? "default"
+                                : invoice.status === "partial_paid"
+                                ? "secondary"
+                                : "outline"
+                            }
+                            className={
+                              invoice.status === "paid"
+                                ? "bg-green-100 text-green-800"
+                                : invoice.status === "overdue"
+                                ? "bg-red-100 text-red-800"
+                                : ""
+                            }
+                          >
+                            {invoice.status === "draft" && "下書き"}
+                            {invoice.status === "issued" && "発行済"}
+                            {invoice.status === "sent" && "送付済"}
+                            {invoice.status === "partial_paid" && "一部入金"}
+                            {invoice.status === "paid" && "入金済"}
+                            {invoice.status === "overdue" && "期限超過"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openPaymentDialog(invoice)}
+                            disabled={invoice.status === "paid"}
+                          >
+                            <CreditCard className="mr-1 h-3 w-3" />
+                            入金記録
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Payment Dialog */}
+          <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>入金記録</DialogTitle>
+                <DialogDescription>入金情報を記録します</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label>入金日</Label>
+                  <Input
+                    type="date"
+                    value={paymentDate}
+                    onChange={(e) => setPaymentDate(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>入金額</Label>
+                  <Input
+                    type="number"
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>入金方法</Label>
+                  <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="bank_transfer">銀行振込</SelectItem>
+                      <SelectItem value="cash">現金</SelectItem>
+                      <SelectItem value="credit_card">クレジットカード</SelectItem>
+                      <SelectItem value="check">小切手</SelectItem>
+                      <SelectItem value="other">その他</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setPaymentDialogOpen(false)}>
+                  キャンセル
+                </Button>
+                <Button onClick={handleRecordPayment} disabled={recordPayment.isPending}>
+                  {recordPayment.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  記録する
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         {/* Photos Tab */}

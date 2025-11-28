@@ -133,43 +133,41 @@ export function useGamification({ companyId }: { companyId: string }, enabled = 
   return useQuery({
     queryKey: [...gamificationKeys.all, "combined", companyId],
     queryFn: async () => {
-      // 統計情報を取得（実際の実装ではAPIから取得）
-      // デモ用にダミーデータを返す
+      // XP情報とバッジ情報を並列取得
+      const [xpRes, badgesRes] = await Promise.all([
+        apiClient.get<{ data: XpInfo }>("/gamification/xp", { companyId }).catch(() => null),
+        apiClient.get<{ data: BadgeInfo }>("/gamification/badges", { companyId }).catch(() => null),
+      ]);
+
+      // ダッシュボードから統計を取得
+      const dashboardRes = await apiClient
+        .get<{
+          data: {
+            estimates?: { total?: number };
+            projects?: { total?: number; completed?: number };
+            houses?: { total?: number };
+          };
+        }>("/dashboard", { companyId })
+        .catch(() => null);
+
+      const xpInfo = xpRes?.data;
+      const badgeInfo = badgesRes?.data;
+      const dashboardData = dashboardRes?.data;
+
       const stats: GamificationStats = {
-        xp: 1250,
-        level: 5,
-        levelInfo: {
-          level: 5,
-          currentXp: 150,
-          nextLevelXp: 500,
+        xp: xpInfo?.xp ?? 0,
+        level: xpInfo?.level ?? 1,
+        levelInfo: xpInfo?.levelInfo ?? {
+          level: 1,
+          currentXp: 0,
+          nextLevelXp: 200,
         },
-        totalEstimates: 15,
-        totalOrders: 8,
-        completedProjects: 5,
-        totalHouses: 12,
-        totalNfts: 3,
-        badges: [
-          {
-            id: "1",
-            code: "estimate_beginner",
-            name: "見積ビギナー",
-            description: "初めての見積書を作成",
-            iconUrl: null,
-            conditionType: "estimate_count",
-            conditionValue: 1,
-            xpReward: 50,
-          },
-          {
-            id: "2",
-            code: "first_order",
-            name: "初受注",
-            description: "初めての受注を獲得",
-            iconUrl: null,
-            conditionType: "order_count",
-            conditionValue: 1,
-            xpReward: 100,
-          },
-        ],
+        totalEstimates: dashboardData?.estimates?.total ?? 0,
+        totalOrders: dashboardData?.projects?.total ?? 0,
+        completedProjects: dashboardData?.projects?.completed ?? 0,
+        totalHouses: dashboardData?.houses?.total ?? 0,
+        totalNfts: 0,
+        badges: badgeInfo?.earned ?? [],
       };
       return { data: stats };
     },

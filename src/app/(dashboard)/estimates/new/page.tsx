@@ -28,6 +28,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
   ArrowLeft,
   Plus,
   Trash,
@@ -38,11 +48,16 @@ import {
   GripVertical,
   Lightbulb,
   Loader2,
+  Package,
+  Wrench,
+  Search,
+  Check,
 } from "lucide-react";
 import { UNITS } from "@/constants";
 import { useCustomers } from "@/hooks/use-customers";
 import { useHouses } from "@/hooks/use-houses";
 import { useCreateEstimate } from "@/hooks/use-estimates";
+import { useMaterials, useLaborTypes, Material, LaborType } from "@/hooks/use-masters";
 import { useAppStore, DEMO_COMPANY_ID } from "@/stores/app-store";
 import { toast } from "sonner";
 
@@ -186,6 +201,24 @@ export default function NewEstimatePage() {
   });
   const houses = housesData?.data ?? [];
 
+  // マスタデータ取得
+  const [masterSearch, setMasterSearch] = useState("");
+  const [masterDialogOpen, setMasterDialogOpen] = useState(false);
+  const [selectedMaterials, setSelectedMaterials] = useState<string[]>([]);
+  const [selectedLabors, setSelectedLabors] = useState<string[]>([]);
+
+  const { data: materials, isLoading: isLoadingMaterials } = useMaterials({
+    companyId,
+    search: masterSearch || undefined,
+    isActive: true,
+  });
+
+  const { data: laborTypes, isLoading: isLoadingLabors } = useLaborTypes({
+    companyId,
+    search: masterSearch || undefined,
+    isActive: true,
+  });
+
   // 見積作成ミューテーション
   const createEstimate = useCreateEstimate();
 
@@ -218,6 +251,72 @@ export default function NewEstimatePage() {
       costLabor: 0,
       profitRate: store.globalProfitRate,
     });
+  };
+
+  // マスタから材料を追加
+  const addMaterialToDetail = (material: Material) => {
+    store.addDetail({
+      name: material.name,
+      quantity: 1,
+      unit: material.unit,
+      costMaterial: Number(material.costPrice),
+      costLabor: 0,
+      profitRate: store.globalProfitRate,
+    });
+  };
+
+  // マスタから工種を追加
+  const addLaborToDetail = (labor: LaborType) => {
+    store.addDetail({
+      name: labor.name,
+      quantity: 1,
+      unit: "人工",
+      costMaterial: 0,
+      costLabor: Number(labor.dailyRate),
+      profitRate: store.globalProfitRate,
+    });
+  };
+
+  // 選択したマスタを追加
+  const handleAddFromMaster = () => {
+    // 材料を追加
+    if (materials) {
+      selectedMaterials.forEach((id) => {
+        const material = materials.find((m) => m.id === id);
+        if (material) {
+          addMaterialToDetail(material);
+        }
+      });
+    }
+    // 工種を追加
+    if (laborTypes) {
+      selectedLabors.forEach((id) => {
+        const labor = laborTypes.find((l) => l.id === id);
+        if (labor) {
+          addLaborToDetail(labor);
+        }
+      });
+    }
+    // リセット
+    setSelectedMaterials([]);
+    setSelectedLabors([]);
+    setMasterSearch("");
+    setMasterDialogOpen(false);
+    toast.success("マスタから追加しました");
+  };
+
+  // 材料の選択トグル
+  const toggleMaterialSelection = (id: string) => {
+    setSelectedMaterials((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  // 工種の選択トグル
+  const toggleLaborSelection = (id: string) => {
+    setSelectedLabors((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
   };
 
   // 下書き保存
@@ -520,9 +619,182 @@ export default function NewEstimatePage() {
           <div className="flex items-center justify-between">
             <CardTitle>見積明細</CardTitle>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" disabled>
-                マスタから追加
-              </Button>
+              <Dialog open={masterDialogOpen} onOpenChange={setMasterDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Package className="mr-2 h-4 w-4" />
+                    マスタから追加
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-3xl">
+                  <DialogHeader>
+                    <DialogTitle>マスタから追加</DialogTitle>
+                    <DialogDescription>
+                      材料・工種マスタから見積明細に追加します
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    {/* 検索 */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="検索..."
+                        className="pl-9"
+                        value={masterSearch}
+                        onChange={(e) => setMasterSearch(e.target.value)}
+                      />
+                    </div>
+
+                    <Tabs defaultValue="materials" className="w-full">
+                      <TabsList className="w-full">
+                        <TabsTrigger value="materials" className="flex-1">
+                          <Package className="mr-2 h-4 w-4" />
+                          材料マスタ
+                        </TabsTrigger>
+                        <TabsTrigger value="labors" className="flex-1">
+                          <Wrench className="mr-2 h-4 w-4" />
+                          工種マスタ
+                        </TabsTrigger>
+                      </TabsList>
+
+                      {/* 材料タブ */}
+                      <TabsContent value="materials">
+                        <ScrollArea className="h-[300px] rounded-md border">
+                          {isLoadingMaterials ? (
+                            <div className="flex items-center justify-center h-32">
+                              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                            </div>
+                          ) : materials && materials.length > 0 ? (
+                            <div className="divide-y">
+                              {materials.map((material) => (
+                                <div
+                                  key={material.id}
+                                  className={`flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 ${
+                                    selectedMaterials.includes(material.id) ? "bg-primary/10" : ""
+                                  }`}
+                                  onClick={() => toggleMaterialSelection(material.id)}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div
+                                      className={`w-5 h-5 rounded border flex items-center justify-center ${
+                                        selectedMaterials.includes(material.id)
+                                          ? "bg-primary border-primary"
+                                          : "border-input"
+                                      }`}
+                                    >
+                                      {selectedMaterials.includes(material.id) && (
+                                        <Check className="h-3 w-3 text-white" />
+                                      )}
+                                    </div>
+                                    <div>
+                                      <p className="font-medium">{material.name}</p>
+                                      <p className="text-sm text-muted-foreground">
+                                        {material.productCode || "-"} / {material.unit}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="font-medium">
+                                      ¥{Number(material.costPrice).toLocaleString()}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">原価</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
+                              <Package className="h-8 w-8 mb-2" />
+                              <p>材料マスタがありません</p>
+                              <p className="text-sm">設定 → マスタ管理から登録してください</p>
+                            </div>
+                          )}
+                        </ScrollArea>
+                      </TabsContent>
+
+                      {/* 工種タブ */}
+                      <TabsContent value="labors">
+                        <ScrollArea className="h-[300px] rounded-md border">
+                          {isLoadingLabors ? (
+                            <div className="flex items-center justify-center h-32">
+                              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                            </div>
+                          ) : laborTypes && laborTypes.length > 0 ? (
+                            <div className="divide-y">
+                              {laborTypes.map((labor) => (
+                                <div
+                                  key={labor.id}
+                                  className={`flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 ${
+                                    selectedLabors.includes(labor.id) ? "bg-primary/10" : ""
+                                  }`}
+                                  onClick={() => toggleLaborSelection(labor.id)}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div
+                                      className={`w-5 h-5 rounded border flex items-center justify-center ${
+                                        selectedLabors.includes(labor.id)
+                                          ? "bg-primary border-primary"
+                                          : "border-input"
+                                      }`}
+                                    >
+                                      {selectedLabors.includes(labor.id) && (
+                                        <Check className="h-3 w-3 text-white" />
+                                      )}
+                                    </div>
+                                    <div>
+                                      <p className="font-medium">{labor.name}</p>
+                                      <p className="text-sm text-muted-foreground">人工</p>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="font-medium">
+                                      ¥{Number(labor.dailyRate).toLocaleString()}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">日当</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
+                              <Wrench className="h-8 w-8 mb-2" />
+                              <p>工種マスタがありません</p>
+                              <p className="text-sm">設定 → マスタ管理から登録してください</p>
+                            </div>
+                          )}
+                        </ScrollArea>
+                      </TabsContent>
+                    </Tabs>
+
+                    {/* 選択数と追加ボタン */}
+                    <div className="flex items-center justify-between pt-2">
+                      <p className="text-sm text-muted-foreground">
+                        {selectedMaterials.length + selectedLabors.length} 件選択中
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedMaterials([]);
+                            setSelectedLabors([]);
+                            setMasterSearch("");
+                            setMasterDialogOpen(false);
+                          }}
+                        >
+                          キャンセル
+                        </Button>
+                        <Button
+                          onClick={handleAddFromMaster}
+                          disabled={selectedMaterials.length + selectedLabors.length === 0}
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          追加する
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
               <Button variant="outline" size="sm" disabled>
                 過去見積からコピー
               </Button>
