@@ -150,6 +150,11 @@ export const NAVIGATION = [
     href: "/reports",
     icon: "BarChart3",
   },
+  {
+    title: "積立管理",
+    href: "/savings",
+    icon: "PiggyBank",
+  },
 ] as const;
 
 export const SETTINGS_NAVIGATION = [
@@ -157,6 +162,11 @@ export const SETTINGS_NAVIGATION = [
     title: "会社情報",
     href: "/settings/company",
     icon: "Building",
+  },
+  {
+    title: "料金・プラン",
+    href: "/settings/billing",
+    icon: "CreditCard",
   },
   {
     title: "マスタ管理",

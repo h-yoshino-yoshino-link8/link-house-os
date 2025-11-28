@@ -33,6 +33,8 @@ import {
   ChevronRight,
   Trophy,
   Award,
+  PiggyBank,
+  CreditCard,
 } from "lucide-react";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -48,6 +50,8 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Building,
   Database,
   Settings,
+  PiggyBank,
+  CreditCard,
 };
 
 export function Sidebar() {
