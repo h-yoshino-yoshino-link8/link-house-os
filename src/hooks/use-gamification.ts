@@ -111,3 +111,68 @@ export function useCheckBadges() {
     },
   });
 }
+
+// 統合ゲーミフィケーション情報取得
+interface GamificationStats {
+  xp: number;
+  level: number;
+  levelInfo: {
+    level: number;
+    currentXp: number;
+    nextLevelXp: number;
+  };
+  totalEstimates: number;
+  totalOrders: number;
+  completedProjects: number;
+  totalHouses: number;
+  totalNfts: number;
+  badges: Badge[];
+}
+
+export function useGamification({ companyId }: { companyId: string }, enabled = true) {
+  return useQuery({
+    queryKey: [...gamificationKeys.all, "combined", companyId],
+    queryFn: async () => {
+      // 統計情報を取得（実際の実装ではAPIから取得）
+      // デモ用にダミーデータを返す
+      const stats: GamificationStats = {
+        xp: 1250,
+        level: 5,
+        levelInfo: {
+          level: 5,
+          currentXp: 150,
+          nextLevelXp: 500,
+        },
+        totalEstimates: 15,
+        totalOrders: 8,
+        completedProjects: 5,
+        totalHouses: 12,
+        totalNfts: 3,
+        badges: [
+          {
+            id: "1",
+            code: "estimate_beginner",
+            name: "見積ビギナー",
+            description: "初めての見積書を作成",
+            iconUrl: null,
+            conditionType: "estimate_count",
+            conditionValue: 1,
+            xpReward: 50,
+          },
+          {
+            id: "2",
+            code: "first_order",
+            name: "初受注",
+            description: "初めての受注を獲得",
+            iconUrl: null,
+            conditionType: "order_count",
+            conditionValue: 1,
+            xpReward: 100,
+          },
+        ],
+      };
+      return { data: stats };
+    },
+    enabled: enabled && !!companyId,
+  });
+}

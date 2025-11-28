@@ -117,3 +117,35 @@ export function useDeleteEstimate() {
     },
   });
 }
+
+// 受注確定レスポンス型
+interface ConfirmOrderResponse {
+  data: {
+    estimate: {
+      id: string;
+      status: string;
+    };
+    project: {
+      id: string;
+      projectNumber: string;
+      title: string;
+      status: string;
+    };
+    message: string;
+  };
+}
+
+// 受注確定（案件自動作成）
+export function useConfirmOrder(id: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data?: { startDate?: string; endDate?: string }) =>
+      apiClient.post<ConfirmOrderResponse>(`/estimates/${id}/confirm-order`, data || {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: estimateKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: estimateKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+    },
+  });
+}

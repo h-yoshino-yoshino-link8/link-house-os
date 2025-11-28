@@ -61,7 +61,7 @@ import {
 import { ESTIMATE_STATUS } from "@/constants";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
-import { useEstimate, useUpdateEstimate, useDeleteEstimate } from "@/hooks/use-estimates";
+import { useEstimate, useUpdateEstimate, useDeleteEstimate, useConfirmOrder } from "@/hooks/use-estimates";
 import { useEstimateStore } from "@/stores/estimate-store";
 import { PDFDownloadButton } from "@/components/estimates/pdf-download-button";
 import { toast } from "sonner";
@@ -90,6 +90,7 @@ export default function EstimateDetailPage() {
   const estimate = data?.data;
   const updateEstimate = useUpdateEstimate(estimateId);
   const deleteEstimate = useDeleteEstimate();
+  const confirmOrder = useConfirmOrder(estimateId);
 
   const handleStatusChange = async (newStatus: string) => {
     try {
@@ -633,9 +634,26 @@ export default function EstimateDetailPage() {
               )}
               {estimate.status === "submitted" && (
                 <>
-                  <Button onClick={() => handleStatusChange("ordered")} className="bg-green-600 hover:bg-green-700">
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                    受注
+                  <Button
+                    onClick={async () => {
+                      try {
+                        const result = await confirmOrder.mutateAsync({});
+                        toast.success(result.data.message);
+                        // 作成された案件ページへ遷移
+                        router.push(`/projects/${result.data.project.id}`);
+                      } catch {
+                        toast.error("受注確定に失敗しました");
+                      }
+                    }}
+                    className="bg-green-600 hover:bg-green-700"
+                    disabled={confirmOrder.isPending}
+                  >
+                    {confirmOrder.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                    )}
+                    受注確定
                   </Button>
                   <Button variant="outline" onClick={() => handleStatusChange("lost")}>
                     失注

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -18,33 +19,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   ArrowLeft,
   Home,
   MapPin,
-  Calendar,
-  User,
-  Building,
-  Ruler,
-  Shield,
   AlertTriangle,
   CheckCircle,
   Clock,
@@ -55,11 +32,11 @@ import {
   Activity,
   Layers,
   Edit,
-  Camera,
+  Shield,
+  RefreshCw,
 } from "lucide-react";
 import { STRUCTURE_TYPES, COMPONENT_CATEGORIES } from "@/constants";
 import { format } from "date-fns";
-import { ja } from "date-fns/locale";
 import {
   RadarChart,
   PolarGrid,
@@ -68,60 +45,9 @@ import {
   Radar,
   ResponsiveContainer,
 } from "recharts";
-
-// デモデータ
-const houseData = {
-  id: "1",
-  customerId: "1",
-  customerName: "山田太郎",
-  address: "東京都渋谷区○○1-2-3",
-  structureType: "wood",
-  floors: 2,
-  totalArea: 105.5,
-  builtYear: 2010,
-  builder: "○○ハウス",
-  healthScore: 82,
-  lastInspection: new Date("2024-06-15"),
-  nextInspection: new Date("2025-06-15"),
-  createdAt: new Date("2022-04-01"),
-  components: [
-    { id: "1", category: "roof", name: "屋根（コロニアル）", score: 75, lastMaintenance: new Date("2020-05-10"), nextMaintenance: new Date("2025-05-10"), status: "fair" },
-    { id: "2", category: "exterior", name: "外壁（サイディング）", score: 68, lastMaintenance: new Date("2019-08-20"), nextMaintenance: new Date("2024-08-20"), status: "warning" },
-    { id: "3", category: "interior", name: "内装（クロス）", score: 90, lastMaintenance: new Date("2022-03-15"), nextMaintenance: new Date("2032-03-15"), status: "good" },
-    { id: "4", category: "equipment", name: "給湯器", score: 45, lastMaintenance: new Date("2015-04-01"), nextMaintenance: new Date("2025-04-01"), status: "critical" },
-    { id: "5", category: "electrical", name: "分電盤", score: 88, lastMaintenance: new Date("2020-11-10"), nextMaintenance: new Date("2030-11-10"), status: "good" },
-    { id: "6", category: "plumbing", name: "給排水管", score: 72, lastMaintenance: new Date("2018-06-20"), nextMaintenance: new Date("2028-06-20"), status: "fair" },
-  ],
-  alerts: [
-    { id: "1", level: "high", category: "equipment", message: "給湯器：寿命まで残り1-3年（交換推奨）", createdAt: new Date("2024-06-15") },
-    { id: "2", level: "medium", category: "exterior", message: "外壁塗装：2年以内に再塗装を推奨", createdAt: new Date("2024-06-15") },
-  ],
-  maintenanceHistory: [
-    { id: "1", date: new Date("2022-03-15"), type: "interior", description: "クロス張替え（全室）", cost: 450000, contractor: "○○内装" },
-    { id: "2", date: new Date("2020-11-10"), type: "electrical", description: "分電盤交換", cost: 180000, contractor: "△△電気" },
-    { id: "3", date: new Date("2020-05-10"), type: "roof", description: "屋根塗装", cost: 580000, contractor: "□□塗装" },
-    { id: "4", date: new Date("2019-08-20"), type: "exterior", description: "外壁塗装", cost: 1200000, contractor: "□□塗装" },
-  ],
-  projects: [
-    { id: "1", projectNumber: "PRJ-2022-015", title: "内装リフォーム工事", status: "paid", amount: 450000, completedAt: new Date("2022-03-15") },
-    { id: "2", projectNumber: "PRJ-2020-042", title: "屋根・外壁塗装工事", status: "paid", amount: 1780000, completedAt: new Date("2020-05-15") },
-  ],
-  nfts: [
-    { id: "1", tokenId: "0x1234...5678", workType: "内装リフォーム", workDate: new Date("2022-03-15"), contractor: "○○内装" },
-    { id: "2", tokenId: "0x2345...6789", workType: "屋根塗装", workDate: new Date("2020-05-10"), contractor: "□□塗装" },
-    { id: "3", tokenId: "0x3456...7890", workType: "外壁塗装", workDate: new Date("2019-08-20"), contractor: "□□塗装" },
-  ],
-};
-
-// レーダーチャート用データ
-const radarData = [
-  { subject: "屋根", score: 75, fullMark: 100 },
-  { subject: "外壁", score: 68, fullMark: 100 },
-  { subject: "内装", score: 90, fullMark: 100 },
-  { subject: "設備", score: 45, fullMark: 100 },
-  { subject: "電気", score: 88, fullMark: 100 },
-  { subject: "給排水", score: 72, fullMark: 100 },
-];
+import { useHouse } from "@/hooks/use-houses";
+import { useHouseComponents, useRecalculateHealthScore } from "@/hooks/use-house-components";
+import { useMaintenance } from "@/hooks/use-maintenance";
 
 const getScoreColor = (score: number) => {
   if (score >= 90) return "text-green-600";
@@ -139,6 +65,13 @@ const getScoreLabel = (score: number) => {
   return { label: "Critical", color: "bg-red-100 text-red-800" };
 };
 
+const getConditionStatus = (score: number) => {
+  if (score >= 90) return "good";
+  if (score >= 70) return "fair";
+  if (score >= 50) return "warning";
+  return "critical";
+};
+
 const statusColors: Record<string, string> = {
   good: "bg-green-100 text-green-800",
   fair: "bg-yellow-100 text-yellow-800",
@@ -153,11 +86,91 @@ const statusLabels: Record<string, string> = {
   critical: "要対応",
 };
 
+const categoryToJapanese: Record<string, string> = {
+  roof: "屋根",
+  exterior: "外壁",
+  interior: "内装",
+  equipment: "設備",
+  electrical: "電気",
+  plumbing: "給排水",
+};
+
 export default function HouseDetailPage() {
   const params = useParams();
-  const [isInspectionDialogOpen, setIsInspectionDialogOpen] = useState(false);
-  const house = houseData;
+  const houseId = params.id as string;
+
+  // API hooks
+  const { data: houseData, isLoading: houseLoading, error: houseError } = useHouse(houseId);
+  const { data: componentsData, isLoading: componentsLoading } = useHouseComponents(houseId);
+  const { data: maintenanceData, isLoading: maintenanceLoading } = useMaintenance(houseId);
+  const recalculateMutation = useRecalculateHealthScore(houseId);
+
+  const house = houseData?.data;
+  const components = componentsData?.data || [];
+  const maintenanceRecs = maintenanceData?.data || [];
+
+  // Generate radar chart data from components
+  const radarData = useMemo(() => {
+    const categoryScores: Record<string, { total: number; count: number }> = {};
+
+    components.forEach((comp) => {
+      if (!categoryScores[comp.category]) {
+        categoryScores[comp.category] = { total: 0, count: 0 };
+      }
+      categoryScores[comp.category].total += comp.conditionScore;
+      categoryScores[comp.category].count += 1;
+    });
+
+    return Object.entries(categoryScores).map(([category, { total, count }]) => ({
+      subject: categoryToJapanese[category] || category,
+      score: Math.round(total / count),
+      fullMark: 100,
+    }));
+  }, [components]);
+
+  // Map alerts from maintenance recommendations
+  const alerts = useMemo(() => {
+    return maintenanceRecs
+      .filter((rec) => !rec.isResolved)
+      .map((rec) => ({
+        id: rec.id,
+        level: rec.riskLevel,
+        category: rec.component?.category || "general",
+        message: rec.description,
+        createdAt: new Date(rec.createdAt),
+      }));
+  }, [maintenanceRecs]);
+
+  if (houseLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-10 w-64" />
+        <div className="grid gap-4 md:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-32" />
+          ))}
+        </div>
+        <Skeleton className="h-96" />
+      </div>
+    );
+  }
+
+  if (houseError || !house) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4" />
+        <h2 className="text-xl font-semibold mb-2">物件が見つかりません</h2>
+        <p className="text-muted-foreground mb-4">指定された物件は存在しないか、アクセス権限がありません。</p>
+        <Button asChild>
+          <Link href="/houses">物件一覧に戻る</Link>
+        </Button>
+      </div>
+    );
+  }
+
   const healthLabel = getScoreLabel(house.healthScore);
+  const builtYear = house.builtYear || new Date().getFullYear();
+  const age = new Date().getFullYear() - builtYear;
 
   return (
     <div className="space-y-6">
@@ -171,7 +184,7 @@ export default function HouseDetailPage() {
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold">{house.customerName}邸</h1>
+              <h1 className="text-2xl font-bold">{house.customer?.name || "不明"}邸</h1>
               <Badge className={healthLabel.color}>
                 {healthLabel.label}
               </Badge>
@@ -183,53 +196,18 @@ export default function HouseDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => recalculateMutation.mutate()}
+            disabled={recalculateMutation.isPending}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${recalculateMutation.isPending ? "animate-spin" : ""}`} />
+            スコア再計算
+          </Button>
           <Button variant="outline">
             <Edit className="mr-2 h-4 w-4" />
             編集
           </Button>
-          <Dialog open={isInspectionDialogOpen} onOpenChange={setIsInspectionDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Wrench className="mr-2 h-4 w-4" />
-                点検予約
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>点検予約</DialogTitle>
-                <DialogDescription>定期点検を予約します</DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="space-y-2">
-                  <Label>点検種別</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="選択" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="simple">簡易点検（30分）</SelectItem>
-                      <SelectItem value="detailed">詳細点検（60分）</SelectItem>
-                      <SelectItem value="full">総合点検（半日）</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>希望日</Label>
-                  <Input type="date" />
-                </div>
-                <div className="space-y-2">
-                  <Label>備考</Label>
-                  <Textarea placeholder="特に気になる箇所など" />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsInspectionDialogOpen(false)}>
-                  キャンセル
-                </Button>
-                <Button onClick={() => setIsInspectionDialogOpen(false)}>予約</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
         </div>
       </div>
 
@@ -256,25 +234,25 @@ export default function HouseDetailPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {new Date().getFullYear() - house.builtYear}年
+              {age}年
             </div>
             <p className="text-xs text-muted-foreground">
-              {house.builtYear}年築
+              {builtYear}年築
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              前回点検
+              部材数
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-bold">
-              {format(house.lastInspection, "yyyy/M/d")}
+            <div className="text-2xl font-bold">
+              {house._count?.components || components.length}
             </div>
             <p className="text-xs text-muted-foreground">
-              次回: {format(house.nextInspection, "yyyy/M/d")}
+              登録済み部材
             </p>
           </CardContent>
         </Card>
@@ -285,7 +263,7 @@ export default function HouseDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{house.nfts.length}件</div>
+            <div className="text-2xl font-bold">{house._count?.workCertificates || 0}件</div>
             <p className="text-xs text-muted-foreground">
               ブロックチェーン記録済
             </p>
@@ -294,16 +272,16 @@ export default function HouseDetailPage() {
       </div>
 
       {/* Alerts */}
-      {house.alerts.length > 0 && (
+      {alerts.length > 0 && (
         <Card className="border-orange-200 bg-orange-50/50">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-orange-800">
               <AlertTriangle className="h-5 w-5" />
-              アラート（{house.alerts.length}件）
+              アラート（{alerts.length}件）
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {house.alerts.map((alert) => (
+            {alerts.map((alert) => (
               <div
                 key={alert.id}
                 className={`flex items-center justify-between rounded-md p-3 ${
@@ -332,7 +310,6 @@ export default function HouseDetailPage() {
         <TabsList>
           <TabsTrigger value="overview">概要</TabsTrigger>
           <TabsTrigger value="components">部材状態</TabsTrigger>
-          <TabsTrigger value="history">メンテナンス履歴</TabsTrigger>
           <TabsTrigger value="projects">工事履歴</TabsTrigger>
           <TabsTrigger value="nfts">施工証明NFT</TabsTrigger>
         </TabsList>
@@ -352,7 +329,7 @@ export default function HouseDetailPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">所有者</span>
                   <Link href={`/customers/${house.customerId}`} className="font-medium hover:underline">
-                    {house.customerName} 様
+                    {house.customer?.name || "不明"} 様
                   </Link>
                 </div>
                 <Separator />
@@ -363,27 +340,27 @@ export default function HouseDetailPage() {
                 <Separator />
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">構造</span>
-                  <span>{STRUCTURE_TYPES[house.structureType as keyof typeof STRUCTURE_TYPES]}</span>
+                  <span>{house.structureType ? STRUCTURE_TYPES[house.structureType as keyof typeof STRUCTURE_TYPES] || house.structureType : "-"}</span>
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">階数</span>
-                  <span>{house.floors}階建て</span>
+                  <span>{house.floors ? `${house.floors}階建て` : "-"}</span>
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">延床面積</span>
-                  <span>{house.totalArea}㎡</span>
+                  <span>{house.totalArea ? `${house.totalArea}㎡` : "-"}</span>
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">築年</span>
-                  <span>{house.builtYear}年</span>
+                  <span>{house.builtYear ? `${house.builtYear}年` : "-"}</span>
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">建築会社</span>
-                  <span>{house.builder}</span>
+                  <span>{house.builder || "-"}</span>
                 </div>
               </CardContent>
             </Card>
@@ -397,22 +374,32 @@ export default function HouseDetailPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart data={radarData}>
-                      <PolarGrid />
-                      <PolarAngleAxis dataKey="subject" />
-                      <PolarRadiusAxis angle={30} domain={[0, 100]} />
-                      <Radar
-                        name="スコア"
-                        dataKey="score"
-                        stroke="#3b82f6"
-                        fill="#3b82f6"
-                        fillOpacity={0.5}
-                      />
-                    </RadarChart>
-                  </ResponsiveContainer>
-                </div>
+                {componentsLoading ? (
+                  <div className="h-64 flex items-center justify-center">
+                    <Skeleton className="h-48 w-48 rounded-full" />
+                  </div>
+                ) : radarData.length > 0 ? (
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadarChart data={radarData}>
+                        <PolarGrid />
+                        <PolarAngleAxis dataKey="subject" />
+                        <PolarRadiusAxis angle={30} domain={[0, 100]} />
+                        <Radar
+                          name="スコア"
+                          dataKey="score"
+                          stroke="#3b82f6"
+                          fill="#3b82f6"
+                          fillOpacity={0.5}
+                        />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="h-64 flex items-center justify-center text-muted-foreground">
+                    部材が登録されていません
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -437,95 +424,86 @@ export default function HouseDetailPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>カテゴリ</TableHead>
-                    <TableHead>部材名</TableHead>
-                    <TableHead>状態</TableHead>
-                    <TableHead>スコア</TableHead>
-                    <TableHead>前回メンテ</TableHead>
-                    <TableHead>次回推奨</TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {house.components.map((component) => (
-                    <TableRow key={component.id}>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {COMPONENT_CATEGORIES[component.category as keyof typeof COMPONENT_CATEGORIES]?.label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-medium">{component.name}</TableCell>
-                      <TableCell>
-                        <Badge className={statusColors[component.status]}>
-                          {statusLabels[component.status]}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <span className={`font-bold ${getScoreColor(component.score)}`}>
-                            {component.score}
-                          </span>
-                          <Progress value={component.score} className="h-2 w-16" />
-                        </div>
-                      </TableCell>
-                      <TableCell>{format(component.lastMaintenance, "yyyy/M/d")}</TableCell>
-                      <TableCell>
-                        <span className={component.nextMaintenance < new Date() ? "text-red-600 font-medium" : ""}>
-                          {format(component.nextMaintenance, "yyyy/M/d")}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm">
-                          詳細
-                        </Button>
-                      </TableCell>
-                    </TableRow>
+              {componentsLoading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
                   ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* History Tab */}
-        <TabsContent value="history">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                メンテナンス履歴
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>日付</TableHead>
-                    <TableHead>種別</TableHead>
-                    <TableHead>内容</TableHead>
-                    <TableHead>施工業者</TableHead>
-                    <TableHead className="text-right">費用</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {house.maintenanceHistory.map((history) => (
-                    <TableRow key={history.id}>
-                      <TableCell>{format(history.date, "yyyy/M/d")}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {COMPONENT_CATEGORIES[history.type as keyof typeof COMPONENT_CATEGORIES]?.label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-medium">{history.description}</TableCell>
-                      <TableCell>{history.contractor}</TableCell>
-                      <TableCell className="text-right">¥{history.cost.toLocaleString()}</TableCell>
+                </div>
+              ) : components.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>カテゴリ</TableHead>
+                      <TableHead>部材名</TableHead>
+                      <TableHead>状態</TableHead>
+                      <TableHead>スコア</TableHead>
+                      <TableHead>設置日</TableHead>
+                      <TableHead>保証期限</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {components.map((component) => {
+                      const status = getConditionStatus(component.conditionScore);
+                      return (
+                        <TableRow key={component.id}>
+                          <TableCell>
+                            <Badge variant="outline">
+                              {COMPONENT_CATEGORIES[component.category as keyof typeof COMPONENT_CATEGORIES]?.label || component.category}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {component.productName || component.subcategory || component.category}
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={statusColors[status]}>
+                              {statusLabels[status]}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <span className={`font-bold ${getScoreColor(component.conditionScore)}`}>
+                                {component.conditionScore}
+                              </span>
+                              <Progress value={component.conditionScore} className="h-2 w-16" />
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {component.installedDate
+                              ? format(new Date(component.installedDate), "yyyy/M/d")
+                              : "-"}
+                          </TableCell>
+                          <TableCell>
+                            {component.warrantyExpires ? (
+                              <span
+                                className={
+                                  new Date(component.warrantyExpires) < new Date()
+                                    ? "text-red-600 font-medium"
+                                    : ""
+                                }
+                              >
+                                {format(new Date(component.warrantyExpires), "yyyy/M/d")}
+                              </span>
+                            ) : (
+                              "-"
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="sm">
+                              詳細
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="py-8 text-center text-muted-foreground">
+                  部材が登録されていません
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -540,38 +518,64 @@ export default function HouseDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>案件番号</TableHead>
-                    <TableHead>工事名</TableHead>
-                    <TableHead>ステータス</TableHead>
-                    <TableHead>完了日</TableHead>
-                    <TableHead className="text-right">金額</TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {house.projects.map((project) => (
-                    <TableRow key={project.id}>
-                      <TableCell className="font-mono text-sm">{project.projectNumber}</TableCell>
-                      <TableCell className="font-medium">{project.title}</TableCell>
-                      <TableCell>
-                        <Badge className="bg-emerald-100 text-emerald-800">入金済</Badge>
-                      </TableCell>
-                      <TableCell>{format(project.completedAt, "yyyy/M/d")}</TableCell>
-                      <TableCell className="text-right">¥{project.amount.toLocaleString()}</TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/projects/${project.id}`}>
-                            <ExternalLink className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                      </TableCell>
+              {house.projects && house.projects.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>案件番号</TableHead>
+                      <TableHead>工事名</TableHead>
+                      <TableHead>ステータス</TableHead>
+                      <TableHead>完了日</TableHead>
+                      <TableHead className="text-right">金額</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {house.projects.map((project) => (
+                      <TableRow key={project.id}>
+                        <TableCell className="font-mono text-sm">{project.projectNumber}</TableCell>
+                        <TableCell className="font-medium">{project.title}</TableCell>
+                        <TableCell>
+                          <Badge
+                            className={
+                              project.status === "paid"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : project.status === "completed"
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-gray-100 text-gray-800"
+                            }
+                          >
+                            {project.status === "paid"
+                              ? "入金済"
+                              : project.status === "completed"
+                              ? "完了"
+                              : project.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {project.endDate ? format(new Date(project.endDate), "yyyy/M/d") : "-"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {project.contractAmount
+                            ? `¥${project.contractAmount.toLocaleString()}`
+                            : "-"}
+                        </TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link href={`/projects/${project.id}`}>
+                              <ExternalLink className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="py-8 text-center text-muted-foreground">
+                  工事履歴がありません
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -587,37 +591,45 @@ export default function HouseDetailPage() {
               <CardDescription>ブロックチェーンに記録された施工証明</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {house.nfts.map((nft) => (
-                  <Card key={nft.id} className="overflow-hidden">
-                    <div className="aspect-video bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                      <Shield className="h-16 w-16 text-white/80" />
-                    </div>
-                    <CardContent className="p-4 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium">{nft.workType}</p>
-                        <Badge variant="outline">
-                          <CheckCircle className="mr-1 h-3 w-3 text-green-600" />
-                          認証済
-                        </Badge>
+              {house.workCertificates && house.workCertificates.length > 0 ? (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {house.workCertificates.map((cert) => (
+                    <Card key={cert.id} className="overflow-hidden">
+                      <div className="aspect-video bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                        <Shield className="h-16 w-16 text-white/80" />
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        施工日: {format(nft.workDate, "yyyy/M/d")}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        施工業者: {nft.contractor}
-                      </p>
-                      <p className="text-xs text-muted-foreground font-mono truncate">
-                        Token: {nft.tokenId}
-                      </p>
-                      <Button variant="outline" size="sm" className="w-full">
-                        <ExternalLink className="mr-2 h-3 w-3" />
-                        ブロックチェーンで確認
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                      <CardContent className="p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="font-medium">{cert.workType}</p>
+                          <Badge variant="outline">
+                            <CheckCircle className="mr-1 h-3 w-3 text-green-600" />
+                            認証済
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          施工日: {format(new Date(cert.workDate), "yyyy/M/d")}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          施工業者: {cert.contractorName}
+                        </p>
+                        {cert.nftTokenId && (
+                          <p className="text-xs text-muted-foreground font-mono truncate">
+                            Token: {cert.nftTokenId}
+                          </p>
+                        )}
+                        <Button variant="outline" size="sm" className="w-full">
+                          <ExternalLink className="mr-2 h-3 w-3" />
+                          ブロックチェーンで確認
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-8 text-center text-muted-foreground">
+                  施工証明NFTがありません
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
