@@ -1,40 +1,17 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-// 認証が必要なルート
-const isProtectedRoute = createRouteMatcher([
-  "/dashboard(.*)",
-  "/customers(.*)",
-  "/houses(.*)",
-  "/estimates(.*)",
-  "/projects(.*)",
-  "/schedules(.*)",
-  "/photos(.*)",
-  "/documents(.*)",
-  "/analytics(.*)",
-  "/settings(.*)",
-  "/invoices(.*)",
-  "/reports(.*)",
-  "/savings(.*)",
-  "/gamification(.*)",
-]);
-
-// 公開ルート（認証不要）
-const isPublicRoute = createRouteMatcher([
-  "/",
-  "/sign-in(.*)",
-  "/sign-up(.*)",
-  "/api/webhooks(.*)",
-]);
-
-export default clerkMiddleware(async (auth, req) => {
-  if (isProtectedRoute(req)) {
-    await auth.protect();
-  }
-}, { debug: process.env.NODE_ENV === "development" });
+// 一時的にすべてのリクエストをパススルー（デバッグ用）
+// Clerk認証は後で追加
+export default function proxy(request: NextRequest) {
+  // ログ出力（Vercel Runtime Logsで確認可能）
+  console.log(`[Proxy] ${request.method} ${request.nextUrl.pathname}`);
+  return NextResponse.next();
+}
 
 export const config = {
   matcher: [
-    // Skip Next.js internals and all static files, unless found in search params
+    // Skip Next.js internals and all static files
     "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
     // Always run for API routes
     "/(api|trpc)(.*)",
