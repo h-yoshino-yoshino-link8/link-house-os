@@ -265,8 +265,7 @@ export default function CustomerDetailPage() {
           <TabsTrigger value="overview">概要</TabsTrigger>
           <TabsTrigger value="houses">所有物件</TabsTrigger>
           <TabsTrigger value="transactions">取引履歴</TabsTrigger>
-          <TabsTrigger value="points">ポイント</TabsTrigger>
-          <TabsTrigger value="savings">積立</TabsTrigger>
+          {/* ポイント・積立タブは凍結中 */}
         </TabsList>
 
         {/* Overview Tab */}

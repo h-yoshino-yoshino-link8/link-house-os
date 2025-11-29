@@ -155,16 +155,17 @@ export const NAVIGATION = [
     href: "/invoices",
     icon: "Receipt",
   },
-  {
-    title: "積立管理",
-    href: "/savings",
-    icon: "PiggyBank",
-  },
-  {
-    title: "ゲーミフィケーション",
-    href: "/gamification",
-    icon: "Trophy",
-  },
+  // 以下は凍結中（将来復活予定）
+  // {
+  //   title: "積立管理",
+  //   href: "/savings",
+  //   icon: "PiggyBank",
+  // },
+  // {
+  //   title: "ゲーミフィケーション",
+  //   href: "/gamification",
+  //   icon: "Trophy",
+  // },
 ] as const;
 
 export const SETTINGS_NAVIGATION = [

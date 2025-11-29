@@ -527,15 +527,7 @@ export default function DashboardPage() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-4 rounded-lg bg-amber-50 dark:bg-amber-950/20 p-4">
-              <Trophy className="h-8 w-8 text-amber-500" />
-              <div>
-                <p className="font-medium">レベル {gamification.level}</p>
-                <p className="text-sm text-muted-foreground">
-                  次のレベルまであと {gamification.xpToNextLevel} XP
-                </p>
-              </div>
-            </div>
+            {/* ゲーミフィケーション表示は凍結中 */}
           </CardContent>
         </Card>
       </div>

@@ -32,8 +32,9 @@ const portalNavigation = [
   { title: "請求書", href: "/portal/invoices", icon: CreditCard },
   { title: "メンテナンス", href: "/portal/maintenance", icon: Wrench },
   { title: "施工証明", href: "/portal/certificates", icon: Shield },
-  { title: "積立口座", href: "/portal/savings", icon: PiggyBank },
-  { title: "ポイント", href: "/portal/points", icon: Gift },
+  // 以下は凍結中（将来復活予定）
+  // { title: "積立口座", href: "/portal/savings", icon: PiggyBank },
+  // { title: "ポイント", href: "/portal/points", icon: Gift },
 ];
 
 // QueryClient for React Query
