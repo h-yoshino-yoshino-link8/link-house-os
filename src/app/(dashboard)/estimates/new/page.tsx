@@ -156,8 +156,14 @@ function EstimateDetailRow({
           <span className="text-sm text-muted-foreground">%</span>
         </div>
       </TableCell>
-      <TableCell className="text-right font-medium">
-        ¥{Math.round(detail.priceUnit).toLocaleString()}
+      <TableCell>
+        <Input
+          type="number"
+          value={Math.round(detail.priceUnit)}
+          onChange={(e) => onUpdate(detail.id, { priceUnit: parseFloat(e.target.value) || 0 })}
+          className="w-28 text-right"
+          placeholder="客出単価"
+        />
       </TableCell>
       <TableCell className="text-right font-bold">
         ¥{Math.round(detail.priceTotal).toLocaleString()}
