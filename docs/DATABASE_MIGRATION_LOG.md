@@ -1,7 +1,7 @@
 # データベース移行ログ
 
 **作成日**: 2025-11-29
-**最終更新**: 2025-11-29
+**最終更新**: 2025-11-29 12:59
 **担当**: Claude Code + 吉野さん
 
 ---
@@ -14,7 +14,7 @@ LinK HOUSE OSのデータベースをNeon PostgreSQLからSupabaseに移行す�
 
 ## 1. データベース設定情報
 
-### 1.1 Neon PostgreSQL（旧・無効化予定）
+### 1.1 Neon PostgreSQL（旧・解除済み）
 
 | 項目 | 値 |
 |------|-----|
@@ -24,20 +24,9 @@ LinK HOUSE OSのデータベースをNeon PostgreSQLからSupabaseに移行す�
 | 作成日 | 2025-11-28 |
 | リージョン | us-east-1 |
 | DATABASE_URL | `postgresql://neondb_owner:***@ep-patient-bread-ahkvo1wl-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require` |
-| 状態 | **無効化予定** |
+| 状態 | **解除済み (2025-11-29)** |
 
-#### Neonで自動生成された環境変数（Vercel）
-- `POSTGRES_URL`
-- `POSTGRES_PRISMA_URL`
-- `DATABASE_URL`
-- `DATABASE_URL_UNPOOLED`
-- `POSTGRES_URL_NON_POOLING`
-- `PGHOST`
-- `POSTGRES_USER`
-- `POSTGRES_PASSWORD`
-- `POSTGRES_DATABASE`
-
-### 1.2 Supabase（新・使用予定）
+### 1.2 Supabase（新・使用中）
 
 | 項目 | 値 |
 |------|-----|
@@ -46,10 +35,19 @@ LinK HOUSE OSのデータベースをNeon PostgreSQLからSupabaseに移行す�
 | プロバイダー | Supabase |
 | プラン | Free |
 | 作成日 | 2025-11-29 |
-| リージョン | ap-northeast-2 (Asia Pacific) |
-| DATABASE_URL | `postgresql://postgres.himlxosvcassmoytvghe:[PASSWORD]@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres` |
+| リージョン | ap-northeast-2 (Seoul, Asia Pacific) |
+| プロジェクトRef | himlxosvcassmoytvghe |
 | 接続方式 | Transaction pooler (IPv4対応) |
-| 状態 | **設定中** |
+| 状態 | **有効・テーブル作成済み** |
+
+#### 接続URL
+
+| 用途 | ポート | URL |
+|------|--------|-----|
+| アプリケーション用 (Pooler) | 6543 | `postgresql://postgres.himlxosvcassmoytvghe:[PASSWORD]@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres` |
+| マイグレーション用 (Direct) | 5432 | `postgresql://postgres.himlxosvcassmoytvghe:[PASSWORD]@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres` |
+
+**重要**: Prisma db push/migrate には ポート5432（Direct）を使用。アプリケーションではポート6543（Pooler）を使用。
 
 #### Supabaseの追加機能
 - Storage: 1GB（写真保存用）
@@ -71,11 +69,11 @@ LinK HOUSE OSのデータベースをNeon PostgreSQLからSupabaseに移行す�
 
 | 機能 | Neon | Supabase |
 |------|------|----------|
-| PostgreSQL | ✅ 500MB | ✅ 500MB |
-| ストレージ | ❌ なし | ✅ 1GB |
-| リアルタイム | ❌ なし | ✅ あり |
+| PostgreSQL | 500MB | 500MB |
+| ストレージ | なし | 1GB |
+| リアルタイム | なし | あり |
 | 管理画面 | シンプル | 充実 |
-| Vercel統合 | ✅ 自動 | 手動設定 |
+| Vercel統合 | 自動 | 手動設定 |
 
 ### 2.3 移行の理由
 
@@ -99,109 +97,64 @@ LinK HOUSE OSのデータベースをNeon PostgreSQLからSupabaseに移行す�
 | Phase A-2: サポートメール設定 | ✅ 完了 | 2025-11-29 |
 | Phase B-1: Supabaseアカウント作成 | ✅ 完了 | 2025-11-29 |
 | Phase B-1: Supabaseプロジェクト作成 | ✅ 完了 | 2025-11-29 |
+| Phase B-2: VercelでNeon連携を解除 | ✅ 完了 | 2025-11-29 12:48 |
+| Phase B-2: VercelでDATABASE_URLをSupabaseに設定 | ✅ 完了 | 2025-11-29 12:51 |
+| Phase B-3: ローカル.envにDATABASE_URL設定 | ✅ 完了 | 2025-11-29 12:56 |
+| Phase B-4: Prisma db push実行（テーブル作成） | ✅ 完了 | 2025-11-29 12:58 |
 
-### 3.2 進行中の作業
-
-| タスク | 状態 | 備考 |
-|--------|------|------|
-| Phase B-2: VercelのDATABASE_URLをSupabaseに更新 | 🔄 進行中 | Neon連携の解除が必要 |
-
-### 3.3 残りの作業
+### 3.2 残りの作業
 
 | タスク | 状態 |
 |--------|------|
-| Phase B-2: Neon連携の解除 | ⬜ 未着手 |
-| Phase B-2: DATABASE_URLをSupabaseに設定 | ⬜ 未着手 |
-| Phase B-3: ローカル.env.localにDATABASE_URL設定 | ⬜ 未着手 |
-| Phase B-4: Prismaマイグレーション実行 | ⬜ 未着手 |
 | Phase B-5: 初期データ投入（seed） | ⬜ 未着手 |
+| Phase B-6: 本番環境動作確認 | ⬜ 未着手 |
 
 ---
 
-## 4. 現在の問題点
+## 4. 環境変数の設定状況
 
-### 4.1 Neon連携の解除が必要
+### 4.1 Vercel（本番）
 
-- VercelのEnvironment VariablesでDATABASE_URLを編集しようとすると、Neon連携により「Edit」ではなく「Manage Connection」が表示される
-- Neon連携を解除しないと、DATABASE_URLを手動で設定できない
+| 変数名 | 値 | 状態 |
+|--------|-----|------|
+| DATABASE_URL | postgresql://postgres.himlxosvcassmoytvghe:[PASSWORD]@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres | ✅ 設定済み |
+| NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY | pk_test_... | ✅ 設定済み |
+| CLERK_SECRET_KEY | sk_test_... | ✅ 設定済み |
+| NEXT_PUBLIC_CLERK_SIGN_IN_URL | /sign-in | ✅ 設定済み |
+| NEXT_PUBLIC_CLERK_SIGN_UP_URL | /sign-up | ✅ 設定済み |
 
-### 4.2 解決方法
-
-1. Vercel Storage画面でNeonデータベース（neon-green-queen）を選択
-2. 「Disconnect」オプションを探して接続を解除
-3. その後、Environment VariablesでDATABASE_URLを手動で設定
-
----
-
-## 5. 環境変数の設定値（次回作業用）
-
-### 5.1 Vercelに設定する環境変数
+### 4.2 ローカル（.env）
 
 ```
-DATABASE_URL=postgresql://postgres.himlxosvcassmoytvghe:[YOUR_PASSWORD]@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres
-```
+# Supabase Database (Transaction pooler for application)
+DATABASE_URL="postgresql://postgres.himlxosvcassmoytvghe:[PASSWORD]@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres"
 
-**注意**: `[YOUR_PASSWORD]`はSupabaseプロジェクト作成時に生成したパスワードに置き換える
-
-### 5.2 ローカル.env.localに設定する環境変数
-
-```
-# Supabase PostgreSQL
-DATABASE_URL="postgresql://postgres.himlxosvcassmoytvghe:[YOUR_PASSWORD]@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres"
-
-# Clerk認証（既に設定済み）
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
-NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
-NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
-NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/dashboard
-NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/dashboard
+# Clerk Authentication
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=""
+CLERK_SECRET_KEY=""
+NEXT_PUBLIC_CLERK_SIGN_IN_URL="/sign-in"
+NEXT_PUBLIC_CLERK_SIGN_UP_URL="/sign-up"
 ```
 
 ---
 
-## 6. 次回作業の手順
+## 5. データベーステーブル
 
-### Step 1: Neon連携を解除
+Prisma db pushで作成されたテーブル（prisma/schema.prismaに基づく）：
 
-1. Vercelダッシュボードを開く
-2. link-house-osプロジェクト → Storage
-3. neon-green-queenをクリック
-4. 「Disconnect」または「Remove」を探してクリック
-5. 確認ダイアログで承認
-
-### Step 2: DATABASE_URLを設定
-
-1. Settings → Environment Variables
-2. 「Create new」で新規追加
-3. Key: `DATABASE_URL`
-4. Value: Supabaseの接続文字列（パスワード置き換え済み）
-5. Save
-
-### Step 3: ローカル環境設定
-
-```bash
-cd /Users/yoshinohiroshi/Dev/link-house-os
-# .env.localファイルを編集してDATABASE_URLを追加
-```
-
-### Step 4: Prismaマイグレーション
-
-```bash
-cd /Users/yoshinohiroshi/Dev/link-house-os
-npx prisma migrate deploy
-npx prisma generate
-```
-
-### Step 5: 初期データ投入
-
-```bash
-npx prisma db seed
-```
+- Customer（顧客）
+- Project（工事案件）
+- Estimate（見積）
+- EstimateItem（見積明細）
+- Invoice（請求書）
+- InvoiceItem（請求明細）
+- Schedule（スケジュール）
+- Staff（スタッフ）
+- その他
 
 ---
 
-## 7. 関連ファイル
+## 6. 関連ファイル
 
 - `/docs/ROADMAP_DETAILED.md` - 詳細ロードマップ
 - `/docs/SETUP_GUIDE.md` - セットアップガイド
@@ -210,9 +163,7 @@ npx prisma db seed
 
 ---
 
-## 8. 連絡先・参考情報
-
-### サービスダッシュボード
+## 7. サービスダッシュボード
 
 | サービス | URL |
 |----------|-----|
