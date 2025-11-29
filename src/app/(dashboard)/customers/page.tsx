@@ -80,6 +80,17 @@ export default function CustomersPage() {
   const [rankFilter, setRankFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
 
+  // 新規顧客フォームの状態
+  const [formData, setFormData] = useState({
+    type: "individual" as "individual" | "corporate",
+    name: "",
+    phone: "",
+    email: "",
+    address: "",
+    tags: "",
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // ストアからcompanyIdを取得（開発時はデモID）
   const companyId = useAppStore((state) => state.companyId) || DEMO_COMPANY_ID;
 
@@ -119,25 +130,46 @@ export default function CustomersPage() {
   const createCustomer = useCreateCustomer();
   const deleteCustomer = useDeleteCustomer();
 
-  const handleCreateCustomer = async (formData: FormData) => {
-    const name = formData.get("name") as string;
-    const type = formData.get("type") as "individual" | "corporate";
-    const phone = formData.get("phone") as string;
-    const email = formData.get("email") as string;
-    const address = formData.get("address") as string;
-    const tagsStr = formData.get("tags") as string;
-    const tags = tagsStr ? tagsStr.split(",").map((t) => t.trim()) : [];
-
-    await createCustomer.mutateAsync({
-      companyId,
-      name,
-      type,
-      phone: phone || undefined,
-      email: email || undefined,
-      address: address || undefined,
-      tags,
+  // フォームリセット
+  const resetForm = () => {
+    setFormData({
+      type: "individual",
+      name: "",
+      phone: "",
+      email: "",
+      address: "",
+      tags: "",
     });
-    setIsDialogOpen(false);
+  };
+
+  // 顧客登録処理
+  const handleSubmit = async () => {
+    if (!formData.name) {
+      alert("氏名/会社名は必須です");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const tags = formData.tags ? formData.tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
+      await createCustomer.mutateAsync({
+        companyId,
+        name: formData.name,
+        type: formData.type,
+        phone: formData.phone || undefined,
+        email: formData.email || undefined,
+        address: formData.address || undefined,
+        tags,
+      });
+      setIsDialogOpen(false);
+      resetForm();
+      alert("顧客を登録しました");
+    } catch (error) {
+      console.error("Failed to create customer:", error);
+      alert("顧客の登録に失敗しました");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (isError) {
@@ -174,7 +206,10 @@ export default function CustomersPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>顧客種別</Label>
-                  <Select defaultValue="individual">
+                  <Select
+                    value={formData.type}
+                    onValueChange={(value: "individual" | "corporate") => setFormData({ ...formData, type: value })}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -185,35 +220,63 @@ export default function CustomersPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>氏名/会社名</Label>
-                  <Input placeholder="山田太郎" />
+                  <Label>氏名/会社名 <span className="text-red-500">*</span></Label>
+                  <Input
+                    placeholder="山田太郎"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>電話番号</Label>
-                  <Input placeholder="090-1234-5678" />
+                  <Input
+                    placeholder="090-1234-5678"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>メールアドレス</Label>
-                  <Input type="email" placeholder="example@email.com" />
+                  <Input
+                    type="email"
+                    placeholder="example@email.com"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label>住所</Label>
-                <Input placeholder="東京都渋谷区○○1-2-3" />
+                <Input
+                  placeholder="東京都渋谷区○○1-2-3"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                />
               </div>
               <div className="space-y-2">
                 <Label>タグ</Label>
-                <Input placeholder="VIP, 紹介, 新規 など（カンマ区切り）" />
+                <Input
+                  placeholder="VIP, 紹介, 新規 など（カンマ区切り）"
+                  value={formData.tags}
+                  onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+                />
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              <Button variant="outline" onClick={() => { setIsDialogOpen(false); resetForm(); }}>
                 キャンセル
               </Button>
-              <Button onClick={() => setIsDialogOpen(false)}>
-                登録
+              <Button onClick={handleSubmit} disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    登録中...
+                  </>
+                ) : (
+                  "登録"
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>

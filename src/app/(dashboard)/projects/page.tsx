@@ -59,7 +59,9 @@ import {
 } from "lucide-react";
 import { PROJECT_STATUS } from "@/constants";
 import { formatDate } from "@/lib/utils/date";
-import { useProjects, useDeleteProject } from "@/hooks/use-projects";
+import { useProjects, useDeleteProject, useCreateProject } from "@/hooks/use-projects";
+import { useCustomers } from "@/hooks/use-customers";
+import { useHouses } from "@/hooks/use-houses";
 import { useAppStore, DEMO_COMPANY_ID } from "@/stores/app-store";
 import type { Project } from "@/lib/api/types";
 
@@ -87,6 +89,18 @@ export default function ProjectsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
 
+  // 新規案件フォームの状態
+  const [formData, setFormData] = useState({
+    title: "",
+    customerId: "",
+    houseId: "",
+    contractAmount: "",
+    costBudget: "",
+    startDate: "",
+    endDate: "",
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // ストアからcompanyIdを取得
   const companyId = useAppStore((state) => state.companyId) || DEMO_COMPANY_ID;
 
@@ -99,9 +113,68 @@ export default function ProjectsPage() {
     limit: 20,
   });
 
+  // 顧客一覧を取得（セレクト用）
+  const { data: customersData } = useCustomers({
+    companyId,
+    limit: 100,
+  });
+  const customers = customersData?.data ?? [];
+
+  // 物件一覧を取得（セレクト用）
+  const { data: housesData } = useHouses({
+    companyId,
+    customerId: formData.customerId || undefined,
+    limit: 100,
+  });
+  const houses = housesData?.data ?? [];
+
   const projects = data?.data ?? [];
   const pagination = data?.pagination;
   const deleteProject = useDeleteProject();
+  const createProject = useCreateProject();
+
+  // フォームリセット
+  const resetForm = () => {
+    setFormData({
+      title: "",
+      customerId: "",
+      houseId: "",
+      contractAmount: "",
+      costBudget: "",
+      startDate: "",
+      endDate: "",
+    });
+  };
+
+  // 案件登録処理
+  const handleSubmit = async () => {
+    if (!formData.title || !formData.customerId) {
+      alert("案件名と顧客は必須です");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await createProject.mutateAsync({
+        companyId,
+        customerId: formData.customerId,
+        houseId: formData.houseId || undefined,
+        title: formData.title,
+        contractAmount: formData.contractAmount ? Number(formData.contractAmount) : undefined,
+        costBudget: formData.costBudget ? Number(formData.costBudget) : undefined,
+        startDate: formData.startDate || undefined,
+        endDate: formData.endDate || undefined,
+      });
+      setIsDialogOpen(false);
+      resetForm();
+      alert("案件を登録しました");
+    } catch (error) {
+      console.error("Failed to create project:", error);
+      alert("案件の登録に失敗しました");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // 統計計算
   const stats = useMemo(() => {
@@ -180,33 +253,57 @@ export default function ProjectsPage() {
                   <p className="text-xs text-muted-foreground">自動採番されます</p>
                 </div>
                 <div className="space-y-2">
-                  <Label>案件名</Label>
-                  <Input placeholder="○○邸 外壁塗装工事" />
+                  <Label>案件名 <span className="text-red-500">*</span></Label>
+                  <Input
+                    placeholder="○○邸 外壁塗装工事"
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>顧客</Label>
-                  <Select>
+                  <Label>顧客 <span className="text-red-500">*</span></Label>
+                  <Select
+                    value={formData.customerId}
+                    onValueChange={(value) => setFormData({ ...formData, customerId: value, houseId: "" })}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="顧客を選択" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="1">山田太郎</SelectItem>
-                      <SelectItem value="2">佐藤建設株式会社</SelectItem>
-                      <SelectItem value="3">田中花子</SelectItem>
+                      {customers.length === 0 ? (
+                        <SelectItem value="_" disabled>顧客がありません</SelectItem>
+                      ) : (
+                        customers.map((customer) => (
+                          <SelectItem key={customer.id} value={customer.id}>
+                            {customer.name}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>物件</Label>
-                  <Select>
+                  <Select
+                    value={formData.houseId}
+                    onValueChange={(value) => setFormData({ ...formData, houseId: value })}
+                    disabled={!formData.customerId}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="物件を選択" />
+                      <SelectValue placeholder={formData.customerId ? "物件を選択" : "先に顧客を選択"} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="1">山田邸</SelectItem>
-                      <SelectItem value="2">佐藤ビル</SelectItem>
+                      {houses.length === 0 ? (
+                        <SelectItem value="_" disabled>物件がありません</SelectItem>
+                      ) : (
+                        houses.map((house) => (
+                          <SelectItem key={house.id} value={house.id}>
+                            {house.address}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -214,42 +311,56 @@ export default function ProjectsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>契約金額</Label>
-                  <Input type="number" placeholder="1,000,000" />
+                  <Input
+                    type="number"
+                    placeholder="1000000"
+                    value={formData.contractAmount}
+                    onChange={(e) => setFormData({ ...formData, contractAmount: e.target.value })}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>原価予算</Label>
-                  <Input type="number" placeholder="700,000" />
+                  <Input
+                    type="number"
+                    placeholder="700000"
+                    value={formData.costBudget}
+                    onChange={(e) => setFormData({ ...formData, costBudget: e.target.value })}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>着工予定日</Label>
-                  <Input type="date" />
+                  <Input
+                    type="date"
+                    value={formData.startDate}
+                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>完工予定日</Label>
-                  <Input type="date" />
+                  <Input
+                    type="date"
+                    value={formData.endDate}
+                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                  />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label>担当者</Label>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="担当者を選択" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="sato">佐藤</SelectItem>
-                    <SelectItem value="tanaka">田中</SelectItem>
-                    <SelectItem value="yamamoto">山本</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              <Button variant="outline" onClick={() => { setIsDialogOpen(false); resetForm(); }}>
                 キャンセル
               </Button>
-              <Button onClick={() => setIsDialogOpen(false)}>登録</Button>
+              <Button onClick={handleSubmit} disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    登録中...
+                  </>
+                ) : (
+                  "登録"
+                )}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
