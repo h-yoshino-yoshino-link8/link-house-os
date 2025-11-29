@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { pdf } from "@react-pdf/renderer";
+import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -10,7 +9,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Download, Loader2, ChevronDown, FileText, FileSpreadsheet } from "lucide-react";
-import { EstimatePDF, prepareEstimateForPDF } from "./estimate-pdf";
 import { toast } from "sonner";
 
 interface PDFDownloadButtonProps {
@@ -53,7 +51,7 @@ interface PDFDownloadButtonProps {
   variant?: "default" | "outline" | "ghost";
   size?: "default" | "sm" | "lg" | "icon";
   className?: string;
-  showDropdown?: boolean; // ドロップダウンメニューを表示するか
+  showDropdown?: boolean;
 }
 
 export function PDFDownloadButton({
@@ -66,9 +64,15 @@ export function PDFDownloadButton({
 }: PDFDownloadButtonProps) {
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const handleDownload = async (showCostColumns: boolean = false) => {
+  const handleDownload = useCallback(async (showCostColumns: boolean = false) => {
     setIsGenerating(true);
     try {
+      // 動的インポートでクライアントサイドでのみロード
+      const [{ pdf }, { EstimatePDF, prepareEstimateForPDF }] = await Promise.all([
+        import("@react-pdf/renderer"),
+        import("./estimate-pdf"),
+      ]);
+
       // PDF用データを準備
       const pdfData = prepareEstimateForPDF(estimate, company, { showCostColumns });
 
@@ -93,7 +97,7 @@ export function PDFDownloadButton({
     } finally {
       setIsGenerating(false);
     }
-  };
+  }, [estimate, company]);
 
   if (!showDropdown) {
     return (
