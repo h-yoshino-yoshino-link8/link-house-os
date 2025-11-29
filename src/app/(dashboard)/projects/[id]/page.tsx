@@ -65,6 +65,7 @@ import { formatDate } from "@/lib/utils/date";
 import { useProject, useUpdateProject } from "@/hooks/use-projects";
 import { useInvoices, useCreateInvoice, useRecordPayment, Invoice } from "@/hooks/use-invoices";
 import { useAppStore, DEMO_COMPANY_ID } from "@/stores/app-store";
+import { InvoicePDFButton } from "@/components/invoices/invoice-pdf-button";
 import { toast } from "sonner";
 
 const statusIcons: Record<string, React.ReactNode> = {
@@ -729,15 +730,42 @@ export default function ProjectDetailPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openPaymentDialog(invoice)}
-                            disabled={invoice.status === "paid"}
-                          >
-                            <CreditCard className="mr-1 h-3 w-3" />
-                            入金記録
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <InvoicePDFButton
+                              invoice={{
+                                invoiceNumber: invoice.invoiceNumber,
+                                title: invoice.title,
+                                issueDate: invoice.issueDate,
+                                dueDate: invoice.dueDate,
+                                subtotal: Number(invoice.subtotal),
+                                taxRate: invoice.taxRate,
+                                tax: Number(invoice.tax),
+                                total: Number(invoice.total),
+                                paidAmount: Number(invoice.paidAmount),
+                                remainingAmount: Number(invoice.remainingAmount),
+                                notes: invoice.notes,
+                                customer: project.customer,
+                                project: project,
+                                details: [{
+                                  id: "1",
+                                  name: invoice.title,
+                                  quantity: 1,
+                                  unitPrice: Number(invoice.subtotal),
+                                  amount: Number(invoice.subtotal),
+                                }],
+                              }}
+                              size="sm"
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openPaymentDialog(invoice)}
+                              disabled={invoice.status === "paid"}
+                            >
+                              <CreditCard className="mr-1 h-3 w-3" />
+                              入金
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
