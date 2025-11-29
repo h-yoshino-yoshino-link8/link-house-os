@@ -390,9 +390,9 @@ export default function EstimateDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">¥{total.toLocaleString()}</div>
+            <div className="text-2xl font-bold">¥{Math.round(total).toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              税抜: ¥{subtotal.toLocaleString()} / 消費税: ¥{tax.toLocaleString()}
+              税抜: ¥{Math.round(subtotal).toLocaleString()} / 消費税: ¥{Math.round(tax).toLocaleString()}
             </p>
           </CardContent>
         </Card>
@@ -406,7 +406,7 @@ export default function EstimateDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">¥{costTotal.toLocaleString()}</div>
+            <div className="text-2xl font-bold">¥{Math.round(costTotal).toLocaleString()}</div>
           </CardContent>
         </Card>
         <Card>
@@ -420,7 +420,7 @@ export default function EstimateDetailPage() {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${profitRate >= 30 ? "text-green-600" : profitRate >= 20 ? "text-yellow-600" : "text-red-600"}`}>
-              ¥{profit.toLocaleString()}
+              ¥{Math.round(profit).toLocaleString()}
             </div>
           </CardContent>
         </Card>
@@ -576,8 +576,8 @@ export default function EstimateDetailPage() {
                 <TableHead className="text-right">原価単価</TableHead>
                 <TableHead className="text-right">原価計</TableHead>
                 <TableHead className="text-right">粗利率</TableHead>
-                <TableHead className="text-right">単価</TableHead>
-                <TableHead className="text-right">金額</TableHead>
+                <TableHead className="text-right">客出単価</TableHead>
+                <TableHead className="text-right">客出金額</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -595,15 +595,15 @@ export default function EstimateDetailPage() {
                     <TableCell className="text-muted-foreground">{detail.specification || "-"}</TableCell>
                     <TableCell className="text-right">{detail.quantity}</TableCell>
                     <TableCell>{detail.unit || "-"}</TableCell>
-                    <TableCell className="text-right">¥{Number(detail.costUnit).toLocaleString()}</TableCell>
-                    <TableCell className="text-right">¥{Number(detail.costTotal).toLocaleString()}</TableCell>
+                    <TableCell className="text-right">¥{Math.round(detail.costUnit).toLocaleString()}</TableCell>
+                    <TableCell className="text-right">¥{Math.round(detail.costTotal).toLocaleString()}</TableCell>
                     <TableCell className="text-right">
                       <span className={Number(detail.profitRate) >= 25 ? "text-green-600" : "text-yellow-600"}>
                         {Number(detail.profitRate).toFixed(0)}%
                       </span>
                     </TableCell>
-                    <TableCell className="text-right">¥{Number(detail.priceUnit).toLocaleString()}</TableCell>
-                    <TableCell className="text-right font-medium">¥{Number(detail.priceTotal).toLocaleString()}</TableCell>
+                    <TableCell className="text-right">¥{Math.round(detail.priceUnit).toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-medium">¥{Math.round(detail.priceTotal).toLocaleString()}</TableCell>
                   </TableRow>
                 ))
               )}
@@ -611,24 +611,24 @@ export default function EstimateDetailPage() {
             <TableFooter>
               <TableRow>
                 <TableCell colSpan={6} className="text-right font-medium">小計（税抜）</TableCell>
-                <TableCell className="text-right">¥{costTotal.toLocaleString()}</TableCell>
+                <TableCell className="text-right">¥{Math.round(costTotal).toLocaleString()}</TableCell>
                 <TableCell></TableCell>
                 <TableCell></TableCell>
-                <TableCell className="text-right font-bold">¥{subtotal.toLocaleString()}</TableCell>
+                <TableCell className="text-right font-bold">¥{Math.round(subtotal).toLocaleString()}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell colSpan={6} className="text-right font-medium">消費税（{estimate.taxRate}%）</TableCell>
                 <TableCell></TableCell>
                 <TableCell></TableCell>
                 <TableCell></TableCell>
-                <TableCell className="text-right">¥{tax.toLocaleString()}</TableCell>
+                <TableCell className="text-right">¥{Math.round(tax).toLocaleString()}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell colSpan={6} className="text-right font-medium">合計（税込）</TableCell>
                 <TableCell></TableCell>
                 <TableCell></TableCell>
                 <TableCell></TableCell>
-                <TableCell className="text-right font-bold text-lg">¥{total.toLocaleString()}</TableCell>
+                <TableCell className="text-right font-bold text-lg">¥{Math.round(total).toLocaleString()}</TableCell>
               </TableRow>
             </TableFooter>
           </Table>
