@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import type { Company, User } from "@/types";
 
 // 開発用デモ会社ID（本番環境ではClerk認証から取得）
-export const DEMO_COMPANY_ID = "demo-company";
+export const DEMO_COMPANY_ID = "company-demo-001";
 
 interface AppState {
   // 現在のユーザー・会社
