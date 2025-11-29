@@ -286,7 +286,11 @@ export default function EditEstimatePage() {
           unit: d.unit,
           costMaterial: d.costMaterial,
           costLabor: d.costLabor,
+          costUnit: d.costUnit,
+          costTotal: d.costTotal,
           profitRate: d.profitRate,
+          priceUnit: d.priceUnit,
+          priceTotal: d.priceTotal,
           internalMemo: d.internalMemo || undefined,
         })),
       });

@@ -323,9 +323,11 @@ export default function EstimatesPage() {
                               <Copy className="mr-2 h-4 w-4" />
                               コピーして作成
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Download className="mr-2 h-4 w-4" />
-                              PDFダウンロード
+                            <DropdownMenuItem asChild>
+                              <Link href={`/estimates/${estimate.id}#pdf`}>
+                                <Download className="mr-2 h-4 w-4" />
+                                PDFダウンロード
+                              </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem>
                               <Send className="mr-2 h-4 w-4" />
