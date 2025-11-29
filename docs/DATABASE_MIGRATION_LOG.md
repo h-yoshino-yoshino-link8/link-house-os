@@ -1,7 +1,7 @@
 # データベース移行ログ
 
 **作成日**: 2025-11-29
-**最終更新**: 2025-11-29 12:59
+**最終更新**: 2025-11-29 14:30
 **担当**: Claude Code + 吉野さん
 
 ---
@@ -24,7 +24,7 @@ LinK HOUSE OSのデータベースをNeon PostgreSQLからSupabaseに移行す�
 | 作成日 | 2025-11-28 |
 | リージョン | us-east-1 |
 | DATABASE_URL | `postgresql://neondb_owner:***@ep-patient-bread-ahkvo1wl-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require` |
-| 状態 | **解除済み (2025-11-29)** |
+| 状態 | **解除済み (2025-11-29 12:48)** |
 
 ### 1.2 Supabase（新・使用中）
 
@@ -38,16 +38,19 @@ LinK HOUSE OSのデータベースをNeon PostgreSQLからSupabaseに移行す�
 | リージョン | ap-northeast-2 (Seoul, Asia Pacific) |
 | プロジェクトRef | himlxosvcassmoytvghe |
 | 接続方式 | Transaction pooler (IPv4対応) |
-| 状態 | **有効・テーブル作成済み** |
+| 状態 | **有効・テーブル作成済み・初期データ投入済み** |
 
 #### 接続URL
 
 | 用途 | ポート | URL |
 |------|--------|-----|
-| アプリケーション用 (Pooler) | 6543 | `postgresql://postgres.himlxosvcassmoytvghe:[PASSWORD]@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres` |
+| アプリケーション用 (Pooler) | 6543 | `postgresql://postgres.himlxosvcassmoytvghe:[PASSWORD]@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1` |
 | マイグレーション用 (Direct) | 5432 | `postgresql://postgres.himlxosvcassmoytvghe:[PASSWORD]@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres` |
 
-**重要**: Prisma db push/migrate には ポート5432（Direct）を使用。アプリケーションではポート6543（Pooler）を使用。
+**重要**:
+- Prisma db push/migrate には ポート5432（Direct）を使用
+- アプリケーションではポート6543（Pooler）+ `?pgbouncer=true&connection_limit=1` を使用
+- `prisma/schema.prisma` に `directUrl` の設定が必要
 
 #### Supabaseの追加機能
 - Storage: 1GB（写真保存用）
@@ -85,7 +88,7 @@ LinK HOUSE OSのデータベースをNeon PostgreSQLからSupabaseに移行す�
 
 ## 3. 移行作業の進捗
 
-### 3.1 完了した作業
+### 3.1 Phase A: 認証設定（完了）
 
 | タスク | 状態 | 日時 |
 |--------|------|------|
@@ -95,24 +98,37 @@ LinK HOUSE OSのデータベースをNeon PostgreSQLからSupabaseに移行す�
 | Phase A-1: サインイン/サインアップページ | ✅ 完了 | 2025-11-29 |
 | Phase A-2: アプリ名「LinK HOUSE OS」に変更 | ✅ 完了 | 2025-11-29 |
 | Phase A-2: サポートメール設定 | ✅ 完了 | 2025-11-29 |
+
+### 3.2 Phase B: データベース設定（完了）
+
+| タスク | 状態 | 日時 |
+|--------|------|------|
 | Phase B-1: Supabaseアカウント作成 | ✅ 完了 | 2025-11-29 |
 | Phase B-1: Supabaseプロジェクト作成 | ✅ 完了 | 2025-11-29 |
 | Phase B-2: VercelでNeon連携を解除 | ✅ 完了 | 2025-11-29 12:48 |
 | Phase B-2: VercelでDATABASE_URLをSupabaseに設定 | ✅ 完了 | 2025-11-29 12:51 |
 | Phase B-3: ローカル.envにDATABASE_URL設定 | ✅ 完了 | 2025-11-29 12:56 |
 | Phase B-4: Prisma db push実行（テーブル作成） | ✅ 完了 | 2025-11-29 12:58 |
+| Phase B-5: 初期データ投入（seed） | ✅ 完了 | 2025-11-29 13:10 |
 
-### 3.2 追加完了した作業
+### 3.3 Phase B-6: Prisma Pooler設定（完了）
+
+Supabase Transaction Poolerを使用する際にPrepared Statementエラーが発生したため、追加設定を実施。
 
 | タスク | 状態 | 日時 |
 |--------|------|------|
-| Phase B-5: 初期データ投入（seed） | ✅ 完了 | 2025-11-29 13:10 |
+| エラー調査（prepared statement already exists） | ✅ 完了 | 2025-11-29 13:30 |
+| DATABASE_URLに`?pgbouncer=true`追加 | ✅ 完了 | 2025-11-29 13:32 |
+| DATABASE_URLに`&connection_limit=1`追加 | ✅ 完了 | 2025-11-29 13:57 |
+| prisma/schema.prismaに`directUrl`追加 | ✅ 完了 | 2025-11-29 14:20 |
+| VercelにDIRECT_URL環境変数追加 | ✅ 完了 | 2025-11-29 14:24 |
+| GitHubにコミット・プッシュ | ✅ 完了 | 2025-11-29 14:20 |
 
-### 3.3 残りの作業
+### 3.4 残りの作業
 
 | タスク | 状態 |
 |--------|------|
-| Phase B-6: 本番環境動作確認 | ⬜ 確認中 |
+| Phase B-7: 本番環境動作確認 | 🔄 確認中 |
 
 ---
 
@@ -122,7 +138,8 @@ LinK HOUSE OSのデータベースをNeon PostgreSQLからSupabaseに移行す�
 
 | 変数名 | 値 | 状態 |
 |--------|-----|------|
-| DATABASE_URL | postgresql://postgres.himlxosvcassmoytvghe:[PASSWORD]@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres | ✅ 設定済み |
+| DATABASE_URL | `postgresql://postgres.himlxosvcassmoytvghe:[PASSWORD]@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1` | ✅ 設定済み |
+| DIRECT_URL | `postgresql://postgres.himlxosvcassmoytvghe:[PASSWORD]@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres` | ✅ 設定済み |
 | NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY | pk_test_... | ✅ 設定済み |
 | CLERK_SECRET_KEY | sk_test_... | ✅ 設定済み |
 | NEXT_PUBLIC_CLERK_SIGN_IN_URL | /sign-in | ✅ 設定済み |
@@ -131,8 +148,12 @@ LinK HOUSE OSのデータベースをNeon PostgreSQLからSupabaseに移行す�
 ### 4.2 ローカル（.env）
 
 ```
-# Supabase Database (Transaction pooler for application)
-DATABASE_URL="postgresql://postgres.himlxosvcassmoytvghe:[PASSWORD]@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres"
+# Supabase Database
+# Transaction pooler for application (port 6543)
+DATABASE_URL="postgresql://postgres.himlxosvcassmoytvghe:[PASSWORD]@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1"
+
+# Direct connection for migrations (port 5432)
+DIRECT_URL="postgresql://postgres.himlxosvcassmoytvghe:[PASSWORD]@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres"
 
 # Clerk Authentication
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=""
@@ -143,32 +164,99 @@ NEXT_PUBLIC_CLERK_SIGN_UP_URL="/sign-up"
 
 ---
 
-## 5. データベーステーブル
+## 5. トラブルシューティング
 
-Prisma db pushで作成されたテーブル（prisma/schema.prismaに基づく）：
+### 5.1 Prepared Statement エラー
 
-- Customer（顧客）
-- Project（工事案件）
-- Estimate（見積）
-- EstimateItem（見積明細）
-- Invoice（請求書）
-- InvoiceItem（請求明細）
-- Schedule（スケジュール）
-- Staff（スタッフ）
-- その他
+**エラー内容:**
+```
+prepared statement "s4" already exists
+prepared statement "s5" does not exist
+```
+
+**原因:**
+Supabase Transaction Pooler (PgBouncer) はprepared statementsをサポートしないため、Prismaのデフォルト動作と競合する。
+
+**解決策:**
+1. DATABASE_URLに`?pgbouncer=true&connection_limit=1`を追加
+2. `prisma/schema.prisma`に`directUrl`を追加
+3. VercelにDIRECT_URL環境変数を追加
+
+**修正したファイル:**
+- `prisma/schema.prisma` - directUrlの追加
+- `.env` - DATABASE_URLとDIRECT_URLの設定
+- Vercel環境変数 - DATABASE_URLとDIRECT_URLの設定
 
 ---
 
-## 6. 関連ファイル
+## 6. データベーステーブル
+
+Prisma db pushで作成されたテーブル（prisma/schema.prismaに基づく）：
+
+### コアテーブル
+- Company（会社）
+- User（ユーザー）
+- Customer（顧客）
+- House（物件）
+- HouseComponent（物件部材）
+
+### 見積・工事
+- Estimate（見積）
+- EstimateDetail（見積明細）
+- Project（工事案件）
+- Schedule（工程）
+- Photo（写真）
+
+### 請求・入金
+- Invoice（請求書）
+- InvoiceDetail（請求明細）
+- Payment（入金）
+
+### マスタ
+- WorkCategory（工事カテゴリ）
+- Material（材料）
+- LaborType（労務）
+
+### その他
+- MaintenanceRecommendation（メンテナンス推奨）
+- WorkCertificate（施工証明）
+- SavingsContract（積立契約）
+- SavingsTransaction（積立取引）
+- PointTransaction（ポイント取引）
+- Referral（紹介）
+- Badge（バッジ）
+- UserBadge（ユーザーバッジ）
+- XpTransaction（XP取引）
+
+---
+
+## 7. 初期投入データ
+
+`prisma/seed.ts`で投入されたデータ：
+
+- 会社: 株式会社LinK
+- 顧客: 5件（田中太郎、山田花子、佐藤一郎、鈴木美咲、高橋健一）
+- 物件: 4件
+- 見積: 3件
+- 案件: 2件
+- 工程: 6件
+- 工事カテゴリ: 10件
+- 材料マスタ: 10件
+- 労務マスタ: 5件
+
+---
+
+## 8. 関連ファイル
 
 - `/docs/ROADMAP_DETAILED.md` - 詳細ロードマップ
 - `/docs/SETUP_GUIDE.md` - セットアップガイド
 - `/prisma/schema.prisma` - データベーススキーマ
 - `/prisma/seed.ts` - 初期データ投入スクリプト
+- `/src/lib/prisma.ts` - Prismaクライアント設定
 
 ---
 
-## 7. サービスダッシュボード
+## 9. サービスダッシュボード
 
 | サービス | URL |
 |----------|-----|
@@ -180,6 +268,14 @@ Prisma db pushで作成されたテーブル（prisma/schema.prismaに基づく�
 ### 本番サイト
 
 - https://link-house-os.vercel.app
+
+---
+
+## 10. 次のステップ
+
+1. **本番環境動作確認** - デプロイ完了後、ダッシュボードでデータベースからの実データ表示を確認
+2. **デモデータからの切り替え** - 確認後、デモデータのフォールバックを削除
+3. **Phase C以降** - 詳細機能の実装
 
 ---
 
