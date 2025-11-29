@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { tryGetPrisma, DEMO_DATA } from "@/lib/api-utils";
+import { createDemoEstimate } from "@/lib/demo-storage";
 
 // GET /api/estimates - 見積一覧取得
 export async function GET(request: NextRequest) {
@@ -95,15 +96,6 @@ export async function GET(request: NextRequest) {
 
 // POST /api/estimates - 見積作成
 export async function POST(request: NextRequest) {
-  const prisma = await tryGetPrisma();
-
-  if (!prisma) {
-    return NextResponse.json(
-      { error: "Database not available. Demo mode does not support creating estimates." },
-      { status: 503 }
-    );
-  }
-
   try {
     const body = await request.json();
     const {
@@ -125,6 +117,60 @@ export async function POST(request: NextRequest) {
         { error: "companyId, customerId, and title are required" },
         { status: 400 }
       );
+    }
+
+    const prisma = await tryGetPrisma();
+
+    // デモモードの場合
+    if (!prisma) {
+      const estimate = createDemoEstimate({
+        companyId,
+        customerId,
+        houseId,
+        title,
+        estimateDate: estimateDate || new Date().toISOString(),
+        validUntil,
+        taxRate: taxRate || 10,
+        notes,
+        internalMemo,
+        details: details?.map((d: {
+          sortOrder?: number;
+          parentId?: string | null;
+          level?: number;
+          isCategory?: boolean;
+          name: string;
+          specification?: string;
+          quantity?: number;
+          unit?: string;
+          costMaterial?: number;
+          costLabor?: number;
+          costUnit?: number;
+          costTotal?: number;
+          profitRate?: number;
+          priceUnit?: number;
+          priceTotal?: number;
+          internalMemo?: string;
+        }, index: number) => ({
+          sortOrder: d.sortOrder ?? index,
+          parentId: d.parentId || null,
+          level: d.level ?? 0,
+          isCategory: d.isCategory ?? false,
+          name: d.name,
+          specification: d.specification,
+          quantity: d.quantity || 1,
+          unit: d.unit,
+          costMaterial: d.costMaterial || 0,
+          costLabor: d.costLabor || 0,
+          costUnit: d.costUnit || 0,
+          costTotal: d.costTotal || 0,
+          profitRate: d.profitRate || 25,
+          priceUnit: d.priceUnit || 0,
+          priceTotal: d.priceTotal || 0,
+          internalMemo: d.internalMemo,
+        })) || [],
+      });
+
+      return NextResponse.json({ data: estimate }, { status: 201 });
     }
 
     // 見積番号を生成

@@ -417,17 +417,39 @@ export const DEMO_DATA = {
     totalAvailable: 3,
   },
 
-  // マスタデータ
+  // マスタデータ（建設業向け）
   materials: [
-    { id: "1", companyId: "demo-company", name: "フローリング材", category: "床材", unit: "m2", unitPrice: 8500, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-    { id: "2", companyId: "demo-company", name: "壁紙クロス", category: "内装", unit: "m2", unitPrice: 1200, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    // 塗装材料
+    { id: "m1", companyId: "demo-company", name: "外壁塗料（シリコン系）", category: "塗装", unit: "缶", unitPrice: 18000, costPrice: 18000, specification: "15L缶", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: "m2", companyId: "demo-company", name: "外壁塗料（フッ素系）", category: "塗装", unit: "缶", unitPrice: 35000, costPrice: 35000, specification: "15L缶", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: "m3", companyId: "demo-company", name: "下塗りシーラー", category: "塗装", unit: "缶", unitPrice: 8000, costPrice: 8000, specification: "15L缶", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    // 内装材料
+    { id: "m4", companyId: "demo-company", name: "フローリング材", category: "床材", unit: "m2", unitPrice: 8500, costPrice: 8500, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: "m5", companyId: "demo-company", name: "壁紙クロス（量産品）", category: "内装", unit: "m2", unitPrice: 800, costPrice: 800, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: "m6", companyId: "demo-company", name: "壁紙クロス（1000番台）", category: "内装", unit: "m2", unitPrice: 1500, costPrice: 1500, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    // 防水材料
+    { id: "m7", companyId: "demo-company", name: "ウレタン防水材", category: "防水", unit: "缶", unitPrice: 25000, costPrice: 25000, specification: "18kg缶", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: "m8", companyId: "demo-company", name: "シーリング材", category: "防水", unit: "本", unitPrice: 800, costPrice: 800, specification: "330ml", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    // 足場・仮設
+    { id: "m9", companyId: "demo-company", name: "足場材（リース）", category: "仮設", unit: "m2", unitPrice: 1200, costPrice: 1200, specification: "月額単価", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: "m10", companyId: "demo-company", name: "養生シート", category: "仮設", unit: "m2", unitPrice: 150, costPrice: 150, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
   ],
   laborTypes: [
-    { id: "1", companyId: "demo-company", name: "大工工事", unit: "人工", unitPrice: 25000, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-    { id: "2", companyId: "demo-company", name: "電気工事", unit: "人工", unitPrice: 28000, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: "l1", companyId: "demo-company", name: "塗装工", unit: "人工", unitPrice: 22000, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: "l2", companyId: "demo-company", name: "大工", unit: "人工", unitPrice: 25000, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: "l3", companyId: "demo-company", name: "左官工", unit: "人工", unitPrice: 24000, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: "l4", companyId: "demo-company", name: "電気工", unit: "人工", unitPrice: 28000, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: "l5", companyId: "demo-company", name: "設備工", unit: "人工", unitPrice: 26000, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: "l6", companyId: "demo-company", name: "内装工", unit: "人工", unitPrice: 20000, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: "l7", companyId: "demo-company", name: "足場工", unit: "人工", unitPrice: 18000, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: "l8", companyId: "demo-company", name: "防水工", unit: "人工", unitPrice: 23000, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
   ],
   workCategories: [
-    { id: "1", companyId: "demo-company", name: "キッチンリフォーム", description: "キッチン関連工事", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-    { id: "2", companyId: "demo-company", name: "浴室リフォーム", description: "浴室関連工事", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: "wc1", companyId: "demo-company", code: "PAINT", name: "塗装工事", description: "外壁・屋根塗装", sortOrder: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: "wc2", companyId: "demo-company", code: "WATER", name: "防水工事", description: "屋上・ベランダ防水", sortOrder: 2, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: "wc3", companyId: "demo-company", code: "INTERIOR", name: "内装工事", description: "クロス・床貼替", sortOrder: 3, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: "wc4", companyId: "demo-company", code: "KITCHEN", name: "キッチンリフォーム", description: "キッチン交換・改修", sortOrder: 4, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: "wc5", companyId: "demo-company", code: "BATH", name: "浴室リフォーム", description: "ユニットバス交換", sortOrder: 5, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: "wc6", companyId: "demo-company", code: "SCAFFOLD", name: "仮設工事", description: "足場設置・養生", sortOrder: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
   ],
 };

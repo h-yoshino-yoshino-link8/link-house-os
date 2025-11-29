@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/db/prisma";
+import { tryGetPrisma } from "@/lib/api-utils";
+import {
+  getDemoEstimate,
+  updateDemoEstimate,
+  createDemoProject,
+} from "@/lib/demo-storage";
 
 // POST /api/estimates/[id]/confirm-order - 見積を受注確定して案件を自動作成
 export async function POST(
@@ -10,6 +15,59 @@ export async function POST(
     const { id } = await params;
     const body = await request.json().catch(() => ({}));
     const { startDate, endDate } = body;
+
+    const prisma = await tryGetPrisma();
+
+    // デモモードの場合
+    if (!prisma) {
+      const demoEstimate = getDemoEstimate(id);
+      if (!demoEstimate) {
+        return NextResponse.json(
+          { error: "Estimate not found" },
+          { status: 404 }
+        );
+      }
+
+      // 既に受注済みの場合
+      if (demoEstimate.status === "ordered") {
+        return NextResponse.json({
+          data: {
+            estimate: {
+              id: demoEstimate.id,
+              status: demoEstimate.status,
+            },
+            project: null,
+            message: "既に受注済みです",
+          },
+        });
+      }
+
+      // 見積を受注済みに更新
+      const updatedEstimate = updateDemoEstimate(id, { status: "ordered" });
+
+      // 案件を作成
+      const project = createDemoProject({
+        companyId: demoEstimate.companyId,
+        customerId: demoEstimate.customerId,
+        estimateId: id,
+        title: demoEstimate.title,
+        status: "contracted",
+        startDate: startDate || null,
+        endDate: endDate || null,
+        contractAmount: demoEstimate.total,
+      });
+
+      return NextResponse.json({
+        data: {
+          estimate: {
+            id: updatedEstimate?.id || id,
+            status: "ordered",
+          },
+          project,
+          message: "受注確定しました。案件を作成しました。（デモモード）",
+        },
+      });
+    }
 
     // 見積を取得
     const estimate = await prisma.estimate.findUnique({
@@ -69,7 +127,7 @@ export async function POST(
     const projectNumber = `PRJ-${year}-${String(nextNumber).padStart(3, "0")}`;
 
     // トランザクションで見積更新と案件作成を同時実行
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: typeof prisma) => {
       // 見積を受注済みに更新
       const updatedEstimate = await tx.estimate.update({
         where: { id },
