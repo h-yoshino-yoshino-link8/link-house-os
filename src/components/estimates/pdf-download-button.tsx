@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -8,8 +8,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Download, Loader2, ChevronDown, FileText, FileSpreadsheet } from "lucide-react";
-import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Download, ChevronDown, FileText, FileSpreadsheet, Printer, X } from "lucide-react";
+import { EstimatePrintPreview } from "./estimate-print-preview";
+import { useReactToPrint } from "react-to-print";
 
 interface PDFDownloadButtonProps {
   estimate: {
@@ -62,85 +69,142 @@ export function PDFDownloadButton({
   className,
   showDropdown = true,
 }: PDFDownloadButtonProps) {
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [showCostColumns, setShowCostColumns] = useState(false);
+  const printRef = useRef<HTMLDivElement | null>(null);
 
-  const handleDownload = useCallback(async (showCostColumns: boolean = false) => {
-    setIsGenerating(true);
-    try {
-      // 動的インポートでクライアントサイドでのみロード
-      const [{ pdf }, { EstimatePDF, prepareEstimateForPDF }] = await Promise.all([
-        import("@react-pdf/renderer"),
-        import("./estimate-pdf"),
-      ]);
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: `見積書_${estimate.estimateNumber}_${estimate.customer?.name || "顧客"}${showCostColumns ? "_社内用" : ""}`,
+    pageStyle: `
+      @page {
+        size: A4 portrait;
+        margin: 10mm;
+      }
+      @media print {
+        body {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+      }
+    `,
+  });
 
-      // PDF用データを準備
-      const pdfData = prepareEstimateForPDF(estimate, company, { showCostColumns });
-
-      // PDF生成
-      const blob = await pdf(<EstimatePDF data={pdfData} />).toBlob();
-
-      // ダウンロード用のリンクを作成
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      const suffix = showCostColumns ? "_社内用" : "";
-      link.download = `見積書_${estimate.estimateNumber}_${estimate.customer?.name || "顧客"}${suffix}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      toast.success("PDFをダウンロードしました");
-    } catch (error) {
-      console.error("PDF generation error:", error);
-      toast.error("PDF生成に失敗しました");
-    } finally {
-      setIsGenerating(false);
-    }
-  }, [estimate, company]);
+  const openPreview = useCallback((withCostColumns: boolean) => {
+    setShowCostColumns(withCostColumns);
+    setIsPreviewOpen(true);
+  }, []);
 
   if (!showDropdown) {
     return (
-      <Button
-        variant={variant}
-        size={size}
-        className={className}
-        onClick={() => handleDownload(false)}
-        disabled={isGenerating}
-      >
-        {isGenerating ? (
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        ) : (
+      <>
+        <Button
+          variant={variant}
+          size={size}
+          className={className}
+          onClick={() => openPreview(false)}
+        >
           <Download className="mr-2 h-4 w-4" />
-        )}
-        {isGenerating ? "生成中..." : "PDF"}
-      </Button>
+          PDF
+        </Button>
+
+        <PreviewDialog
+          isOpen={isPreviewOpen}
+          onClose={() => setIsPreviewOpen(false)}
+          estimate={estimate}
+          company={company}
+          showCostColumns={showCostColumns}
+          printRef={printRef}
+          onPrint={handlePrint}
+        />
+      </>
     );
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant={variant} size={size} className={className} disabled={isGenerating}>
-          {isGenerating ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant={variant} size={size} className={className}>
             <Download className="mr-2 h-4 w-4" />
-          )}
-          {isGenerating ? "生成中..." : "PDF"}
-          <ChevronDown className="ml-2 h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => handleDownload(false)}>
-          <FileText className="mr-2 h-4 w-4" />
-          通常版（顧客向け）
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleDownload(true)}>
-          <FileSpreadsheet className="mr-2 h-4 w-4" />
-          社内用（原価・粗利表示）
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+            PDF
+            <ChevronDown className="ml-2 h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => openPreview(false)}>
+            <FileText className="mr-2 h-4 w-4" />
+            通常版（顧客向け）
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => openPreview(true)}>
+            <FileSpreadsheet className="mr-2 h-4 w-4" />
+            社内用（原価・粗利表示）
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <PreviewDialog
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        estimate={estimate}
+        company={company}
+        showCostColumns={showCostColumns}
+        printRef={printRef}
+        onPrint={handlePrint}
+      />
+    </>
+  );
+}
+
+// プレビューダイアログコンポーネント
+function PreviewDialog({
+  isOpen,
+  onClose,
+  estimate,
+  company,
+  showCostColumns,
+  printRef,
+  onPrint,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  estimate: PDFDownloadButtonProps["estimate"];
+  company?: PDFDownloadButtonProps["company"];
+  showCostColumns: boolean;
+  printRef: React.RefObject<HTMLDivElement | null>;
+  onPrint: () => void;
+}) {
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+        <DialogHeader className="flex flex-row items-center justify-between">
+          <DialogTitle>
+            見積書プレビュー {showCostColumns && "(社内用)"}
+          </DialogTitle>
+          <div className="flex items-center gap-2">
+            <Button onClick={onPrint} size="sm">
+              <Printer className="mr-2 h-4 w-4" />
+              印刷 / PDF保存
+            </Button>
+            <Button variant="ghost" size="icon" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </DialogHeader>
+
+        <div className="border rounded-lg overflow-auto bg-gray-100 p-4">
+          <EstimatePrintPreview
+            ref={printRef}
+            estimate={estimate}
+            company={company}
+            showCostColumns={showCostColumns}
+          />
+        </div>
+
+        <div className="text-sm text-muted-foreground text-center">
+          「印刷 / PDF保存」をクリックし、印刷ダイアログで「PDFに保存」を選択してください
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

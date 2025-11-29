@@ -211,13 +211,6 @@ export default function EstimateDetailPage() {
     );
   }
 
-  const subtotal = Number(estimate.subtotal || 0);
-  const tax = Number(estimate.tax || 0);
-  const total = Number(estimate.total || 0);
-  const costTotal = Number(estimate.costTotal || 0);
-  const profit = Number(estimate.profit || 0);
-  const profitRate = Number(estimate.profitRate || 0);
-
   // Type for estimate detail items from API
   interface EstimateDetailItem {
     id: string;
@@ -237,7 +230,43 @@ export default function EstimateDetailPage() {
     children?: EstimateDetailItem[];
   }
 
-  const details = (estimate.details || []) as EstimateDetailItem[];
+  // 明細を再計算（DBに¥0で保存されている場合でも正しく表示）
+  const calculatePriceFromCost = (cost: number, profitRate: number): number => {
+    if (profitRate >= 100) return cost;
+    return cost / (1 - profitRate / 100);
+  };
+
+  const rawDetails = (estimate.details || []) as EstimateDetailItem[];
+  const details = rawDetails.map(d => {
+    const costMaterial = Number(d.costMaterial || 0);
+    const costLabor = Number(d.costLabor || 0);
+    const quantity = Number(d.quantity || 1);
+    const profitRate = Number(d.profitRate || 25);
+
+    const costUnit = costMaterial + costLabor;
+    const costTotal = costUnit * quantity;
+    const priceUnit = calculatePriceFromCost(costUnit, profitRate);
+    const priceTotal = priceUnit * quantity;
+
+    return {
+      ...d,
+      costMaterial,
+      costLabor,
+      costUnit,
+      costTotal,
+      profitRate,
+      priceUnit,
+      priceTotal,
+    };
+  });
+
+  // 合計を再計算
+  const costTotal = details.reduce((sum, d) => sum + d.costTotal, 0);
+  const subtotal = details.reduce((sum, d) => sum + d.priceTotal, 0);
+  const tax = Math.floor(subtotal * (Number(estimate.taxRate || 10) / 100));
+  const total = subtotal + tax;
+  const profit = subtotal - costTotal;
+  const profitRate = subtotal > 0 ? (profit / subtotal) * 100 : 0;
 
   return (
     <div className="space-y-6">
