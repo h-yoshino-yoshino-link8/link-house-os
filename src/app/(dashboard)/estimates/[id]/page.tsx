@@ -243,15 +243,28 @@ export default function EstimateDetailPage() {
     const quantity = Number(d.quantity || 1);
     const profitRate = Number(d.profitRate || 25);
 
+    // 原価計算（材料費 + 労務費 = 原価単価）
     const costUnit = costMaterial + costLabor;
+    // 原価合計（原価単価 × 数量）
     const costTotal = costUnit * quantity;
+    // 客出し単価（原価単価 ÷ (1 - 粗利率)）
     const priceUnit = calculatePriceFromCost(costUnit, profitRate);
+    // 客出し合計（客出し単価 × 数量）
     const priceTotal = priceUnit * quantity;
 
+    // 全ての計算値を明示的に上書き（DBの古い値を使わない）
     return {
-      ...d,
+      id: d.id,
+      sortOrder: d.sortOrder,
+      name: d.name,
+      specification: d.specification,
+      unit: d.unit,
+      internalMemo: d.internalMemo,
+      children: d.children,
+      // 以下は全て再計算値を使用
       costMaterial,
       costLabor,
+      quantity,
       costUnit,
       costTotal,
       profitRate,

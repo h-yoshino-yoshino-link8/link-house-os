@@ -78,7 +78,7 @@ export function PDFDownloadButton({
     documentTitle: `見積書_${estimate.estimateNumber}_${estimate.customer?.name || "顧客"}${showCostColumns ? "_社内用" : ""}`,
     pageStyle: `
       @page {
-        size: A4 portrait;
+        size: A4 landscape;
         margin: 10mm;
       }
       @media print {

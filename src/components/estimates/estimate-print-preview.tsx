@@ -60,12 +60,12 @@ export const EstimatePrintPreview = forwardRef<HTMLDivElement, EstimatePrintPrev
     const companyPhone = company?.phone || "";
 
     return (
-      <div ref={ref} className="print-preview bg-white p-8 min-h-[297mm] w-[210mm] mx-auto">
+      <div ref={ref} className="print-preview bg-white p-6 min-h-[210mm] w-[297mm] mx-auto">
         <style jsx>{`
           @media print {
             .print-preview {
               margin: 0;
-              padding: 10mm;
+              padding: 8mm;
               width: 100%;
               min-height: auto;
             }
