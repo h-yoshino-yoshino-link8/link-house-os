@@ -37,10 +37,13 @@ interface EstimateState {
   setTaxRate: (rate: number) => void;
 
   addDetail: (detail: Partial<EstimateDetailState>) => void;
+  addCategory: (name: string, level?: number, parentId?: string | null) => string;
+  addChildDetail: (parentId: string, detail?: Partial<EstimateDetailState>) => void;
   updateDetail: (id: string, detail: Partial<EstimateDetailState>) => void;
   removeDetail: (id: string) => void;
   reorderDetails: (details: EstimateDetailState[]) => void;
   clearDetails: () => void;
+  toggleExpanded: (id: string) => void;
 
   setGlobalProfitRate: (rate: number) => void;
   applyGlobalProfitRate: () => void;
@@ -73,6 +76,7 @@ interface EstimateDetailState {
   id: string;
   parentId: string | null;
   sortOrder: number;
+  level: number; // 0: 大項目, 1: 中項目, 2: 小項目
   name: string;
   specification: string;
   quantity: number;
@@ -86,6 +90,7 @@ interface EstimateDetailState {
   priceTotal: number;
   internalMemo: string;
   isExpanded: boolean;
+  isCategory: boolean; // カテゴリ行（子の合計を表示）
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 15);
@@ -139,6 +144,7 @@ export const useEstimateStore = create<EstimateState>()((set, get) => ({
       id: generateId(),
       parentId: detail.parentId ?? null,
       sortOrder: state.details.length,
+      level: detail.level ?? 0,
       name: detail.name ?? "",
       specification: detail.specification ?? "",
       quantity: detail.quantity ?? 1,
@@ -152,18 +158,91 @@ export const useEstimateStore = create<EstimateState>()((set, get) => ({
       priceTotal: 0,
       internalMemo: detail.internalMemo ?? "",
       isExpanded: true,
+      isCategory: detail.isCategory ?? false,
     };
 
-    // 原価計算
-    newDetail.costUnit = newDetail.costMaterial + newDetail.costLabor;
-    newDetail.costTotal = newDetail.costUnit * newDetail.quantity;
+    // カテゴリ行でない場合のみ原価計算
+    if (!newDetail.isCategory) {
+      newDetail.costUnit = newDetail.costMaterial + newDetail.costLabor;
+      newDetail.costTotal = newDetail.costUnit * newDetail.quantity;
+      newDetail.priceUnit = calculatePriceFromCost(
+        newDetail.costUnit,
+        newDetail.profitRate
+      );
+      newDetail.priceTotal = newDetail.priceUnit * newDetail.quantity;
+    }
 
-    // 客出し計算（原価から逆算）
-    newDetail.priceUnit = calculatePriceFromCost(
-      newDetail.costUnit,
-      newDetail.profitRate
-    );
-    newDetail.priceTotal = newDetail.priceUnit * newDetail.quantity;
+    set({ details: [...state.details, newDetail] });
+    get().recalculate();
+  },
+
+  // カテゴリ（大項目/中項目）を追加
+  addCategory: (name, level = 0, parentId = null) => {
+    const state = get();
+    const id = generateId();
+    const newCategory: EstimateDetailState = {
+      id,
+      parentId,
+      sortOrder: state.details.length,
+      level,
+      name,
+      specification: "",
+      quantity: 1,
+      unit: "式",
+      costMaterial: 0,
+      costLabor: 0,
+      costUnit: 0,
+      costTotal: 0,
+      profitRate: 0,
+      priceUnit: 0,
+      priceTotal: 0,
+      internalMemo: "",
+      isExpanded: true,
+      isCategory: true,
+    };
+
+    set({ details: [...state.details, newCategory] });
+    return id;
+  },
+
+  // 親アイテムに子を追加
+  addChildDetail: (parentId, detail = {}) => {
+    const state = get();
+    const parent = state.details.find((d) => d.id === parentId);
+    if (!parent) return;
+
+    const childLevel = parent.level + 1;
+    const newDetail: EstimateDetailState = {
+      id: generateId(),
+      parentId,
+      sortOrder: state.details.length,
+      level: childLevel,
+      name: detail.name ?? "",
+      specification: detail.specification ?? "",
+      quantity: detail.quantity ?? 1,
+      unit: detail.unit ?? "式",
+      costMaterial: detail.costMaterial ?? 0,
+      costLabor: detail.costLabor ?? 0,
+      costUnit: 0,
+      costTotal: 0,
+      profitRate: detail.profitRate ?? state.globalProfitRate,
+      priceUnit: 0,
+      priceTotal: 0,
+      internalMemo: detail.internalMemo ?? "",
+      isExpanded: true,
+      isCategory: detail.isCategory ?? false,
+    };
+
+    // カテゴリ行でない場合のみ原価計算
+    if (!newDetail.isCategory) {
+      newDetail.costUnit = newDetail.costMaterial + newDetail.costLabor;
+      newDetail.costTotal = newDetail.costUnit * newDetail.quantity;
+      newDetail.priceUnit = calculatePriceFromCost(
+        newDetail.costUnit,
+        newDetail.profitRate
+      );
+      newDetail.priceTotal = newDetail.priceUnit * newDetail.quantity;
+    }
 
     set({ details: [...state.details, newDetail] });
     get().recalculate();
@@ -247,6 +326,17 @@ export const useEstimateStore = create<EstimateState>()((set, get) => ({
     get().recalculate();
   },
 
+  toggleExpanded: (id) => {
+    const state = get();
+    const details = state.details.map((detail) => {
+      if (detail.id === id) {
+        return { ...detail, isExpanded: !detail.isExpanded };
+      }
+      return detail;
+    });
+    set({ details });
+  },
+
   setGlobalProfitRate: (rate) => set({ globalProfitRate: rate }),
 
   applyGlobalProfitRate: () => {
@@ -267,8 +357,42 @@ export const useEstimateStore = create<EstimateState>()((set, get) => ({
   recalculate: () => {
     const state = get();
 
+    // 子の合計を親カテゴリに集計する関数
+    const calculateCategoryTotals = (details: EstimateDetailState[]): EstimateDetailState[] => {
+      // 深い階層から順に処理（level 2 → 1 → 0）
+      const maxLevel = Math.max(...details.map((d) => d.level), 0);
+
+      let updatedDetails = [...details];
+
+      for (let level = maxLevel; level >= 0; level--) {
+        updatedDetails = updatedDetails.map((detail) => {
+          if (detail.isCategory && detail.level === level) {
+            // このカテゴリの直接の子を取得
+            const children = updatedDetails.filter((d) => d.parentId === detail.id);
+            if (children.length > 0) {
+              const costTotal = children.reduce((sum, c) => sum + c.costTotal, 0);
+              const priceTotal = children.reduce((sum, c) => sum + c.priceTotal, 0);
+              return {
+                ...detail,
+                costTotal,
+                priceTotal,
+                costUnit: costTotal,
+                priceUnit: priceTotal,
+              };
+            }
+          }
+          return detail;
+        });
+      }
+
+      return updatedDetails;
+    };
+
+    // カテゴリの合計を計算
+    const updatedDetails = calculateCategoryTotals(state.details);
+
     // ルートレベルの明細のみ集計（子は親に含まれる想定）
-    const rootDetails = state.details.filter((d) => !d.parentId);
+    const rootDetails = updatedDetails.filter((d) => !d.parentId);
 
     const costTotal = rootDetails.reduce((sum, d) => sum + d.costTotal, 0);
     const subtotal = rootDetails.reduce((sum, d) => sum + d.priceTotal, 0);
@@ -278,6 +402,7 @@ export const useEstimateStore = create<EstimateState>()((set, get) => ({
     const profitRate = subtotal > 0 ? (profit / subtotal) * 100 : 0;
 
     set({
+      details: updatedDetails,
       costTotal,
       subtotal,
       tax,
@@ -288,8 +413,6 @@ export const useEstimateStore = create<EstimateState>()((set, get) => ({
   },
 
   loadFromEstimate: (data) => {
-    const state = get();
-
     // 基本情報をセット
     set({
       customerId: data.customerId,
@@ -314,6 +437,8 @@ export const useEstimateStore = create<EstimateState>()((set, get) => ({
         costLabor: d.costLabor,
         profitRate: d.profitRate,
         internalMemo: d.internalMemo || "",
+        level: 0,
+        isCategory: false,
       });
     });
 

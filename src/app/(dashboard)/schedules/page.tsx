@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
+import { Slider } from "@/components/ui/slider";
 import {
   Select,
   SelectContent,
@@ -21,6 +22,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import {
   ChevronLeft,
@@ -30,10 +36,13 @@ import {
   Share2,
   Filter,
   Loader2,
+  Edit,
+  Trash2,
+  Check,
 } from "lucide-react";
 import { format, addDays, startOfWeek, eachDayOfInterval, isSameDay, differenceInDays } from "date-fns";
 import { ja } from "date-fns/locale";
-import { useSchedules, useCreateSchedule } from "@/hooks/use-schedules";
+import { useSchedules, useCreateSchedule, useUpdateSchedule, useDeleteSchedule, useUpdateScheduleProgress, ScheduleItem } from "@/hooks/use-schedules";
 import { useAppStore, DEMO_COMPANY_ID } from "@/stores/app-store";
 import { toast } from "sonner";
 
@@ -42,6 +51,8 @@ export default function SchedulesPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedProject, setSelectedProject] = useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState<ScheduleItem | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   // フォーム状態
   const [newSchedule, setNewSchedule] = useState({
@@ -53,12 +64,23 @@ export default function SchedulesPage() {
     color: "#3b82f6",
   });
 
+  const [editForm, setEditForm] = useState({
+    name: "",
+    startDate: "",
+    endDate: "",
+    assignee: "",
+    color: "#3b82f6",
+    progress: 0,
+  });
+
   // API からデータ取得
   const { data, isLoading, isError } = useSchedules({
     companyId,
   });
   const projects = data?.data ?? [];
   const createSchedule = useCreateSchedule();
+  const deleteSchedule = useDeleteSchedule();
+  const updateProgress = useUpdateScheduleProgress();
 
   // 表示する日付範囲（3週間）
   const startOfView = startOfWeek(currentDate, { weekStartsOn: 1 });
@@ -111,6 +133,38 @@ export default function SchedulesPage() {
       });
     } catch {
       toast.error("工程の追加に失敗しました");
+    }
+  };
+
+  const openEditDialog = (schedule: ScheduleItem) => {
+    setEditingSchedule(schedule);
+    setEditForm({
+      name: schedule.name,
+      startDate: schedule.startDate.split("T")[0],
+      endDate: schedule.endDate.split("T")[0],
+      assignee: schedule.assignee || "",
+      color: schedule.color || "#3b82f6",
+      progress: schedule.progress,
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdateProgress = async (scheduleId: string, newProgress: number) => {
+    try {
+      await updateProgress.mutateAsync({ id: scheduleId, progress: newProgress });
+      toast.success("進捗を更新しました");
+    } catch {
+      toast.error("進捗の更新に失敗しました");
+    }
+  };
+
+  const handleDeleteSchedule = async (scheduleId: string) => {
+    if (!confirm("この工程を削除しますか？")) return;
+    try {
+      await deleteSchedule.mutateAsync(scheduleId);
+      toast.success("工程を削除しました");
+    } catch {
+      toast.error("工程の削除に失敗しました");
     }
   };
 
@@ -350,14 +404,34 @@ export default function SchedulesPage() {
                     {project.schedules.map((schedule) => {
                       const position = getBarPosition(schedule.startDate, schedule.endDate);
                       return (
-                        <div key={schedule.id} className="flex border-b hover:bg-muted/20">
+                        <div key={schedule.id} className="flex border-b hover:bg-muted/20 group">
                           <div className="w-64 flex-shrink-0 border-r p-2 pl-6">
-                            <div className="flex items-center gap-2">
-                              <div
-                                className="h-3 w-3 rounded-full"
-                                style={{ backgroundColor: schedule.color || "#3b82f6" }}
-                              />
-                              <span className="text-sm">{schedule.name}</span>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className="h-3 w-3 rounded-full"
+                                  style={{ backgroundColor: schedule.color || "#3b82f6" }}
+                                />
+                                <span className="text-sm">{schedule.name}</span>
+                              </div>
+                              <div className="hidden group-hover:flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={() => openEditDialog(schedule)}
+                                >
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-destructive hover:text-destructive"
+                                  onClick={() => handleDeleteSchedule(schedule.id)}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
                             </div>
                             <div className="text-xs text-muted-foreground ml-5">
                               {schedule.assignee || "-"}
@@ -376,27 +450,66 @@ export default function SchedulesPage() {
                               ))}
                             </div>
                             {/* Schedule Bar */}
-                            <div
-                              className="absolute top-2 h-10 rounded-md flex items-center px-2 text-white text-xs font-medium shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
-                              style={{
-                                left: position.left,
-                                width: position.width,
-                                backgroundColor: schedule.color || "#3b82f6",
-                              }}
-                            >
-                              <div className="truncate">
-                                {schedule.progress > 0 && (
-                                  <span className="mr-1">{schedule.progress}%</span>
-                                )}
-                              </div>
-                              {/* Progress overlay */}
-                              {schedule.progress > 0 && schedule.progress < 100 && (
+                            <Popover>
+                              <PopoverTrigger asChild>
                                 <div
-                                  className="absolute inset-0 bg-black/20 rounded-md"
-                                  style={{ left: `${schedule.progress}%` }}
-                                />
-                              )}
-                            </div>
+                                  className="absolute top-2 h-10 rounded-md flex items-center px-2 text-white text-xs font-medium shadow-sm cursor-pointer hover:opacity-90 transition-opacity overflow-hidden"
+                                  style={{
+                                    left: position.left,
+                                    width: position.width,
+                                    backgroundColor: schedule.color || "#3b82f6",
+                                  }}
+                                >
+                                  {/* Progress background */}
+                                  {schedule.progress > 0 && schedule.progress < 100 && (
+                                    <div
+                                      className="absolute inset-0 bg-black/20"
+                                      style={{ left: `${schedule.progress}%` }}
+                                    />
+                                  )}
+                                  <div className="relative truncate">
+                                    {schedule.progress > 0 && (
+                                      <span className="mr-1">{schedule.progress}%</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-64" align="start">
+                                <div className="space-y-3">
+                                  <div className="font-medium">{schedule.name}</div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {format(new Date(schedule.startDate), "M/d")} - {format(new Date(schedule.endDate), "M/d")}
+                                  </div>
+                                  <div className="space-y-2">
+                                    <div className="flex justify-between text-sm">
+                                      <span>進捗</span>
+                                      <span className="font-medium">{schedule.progress}%</span>
+                                    </div>
+                                    <Slider
+                                      value={[schedule.progress]}
+                                      min={0}
+                                      max={100}
+                                      step={5}
+                                      onValueCommit={(value) => handleUpdateProgress(schedule.id, value[0])}
+                                      className="w-full"
+                                    />
+                                    <div className="flex justify-between gap-1 pt-2">
+                                      {[0, 25, 50, 75, 100].map((val) => (
+                                        <Button
+                                          key={val}
+                                          variant={schedule.progress === val ? "default" : "outline"}
+                                          size="sm"
+                                          className="h-7 px-2 text-xs"
+                                          onClick={() => handleUpdateProgress(schedule.id, val)}
+                                        >
+                                          {val}%
+                                        </Button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              </PopoverContent>
+                            </Popover>
                           </div>
                         </div>
                       );

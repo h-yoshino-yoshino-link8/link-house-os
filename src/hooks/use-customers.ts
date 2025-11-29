@@ -10,6 +10,12 @@ import type {
   CreateCustomerRequest,
   UpdateCustomerRequest,
 } from "@/lib/api/types";
+import {
+  getDemoCustomers,
+  getDemoCustomer,
+  createDemoCustomer,
+  DemoCustomer,
+} from "@/lib/demo-storage";
 
 // クエリキー
 export const customerKeys = {
@@ -41,14 +47,80 @@ export function useCustomers({
 }: UseCustomersOptions) {
   return useQuery({
     queryKey: customerKeys.list({ companyId, rank, search, page, limit }),
-    queryFn: () =>
-      apiClient.get<PaginatedResponse<Customer>>("/customers", {
-        companyId,
-        rank,
-        search,
-        page,
-        limit,
-      }),
+    queryFn: async () => {
+      try {
+        const result = await apiClient.get<PaginatedResponse<Customer>>("/customers", {
+          companyId,
+          rank,
+          search,
+          page,
+          limit,
+        });
+
+        // デモデータとマージ
+        const demoCustomers = getDemoCustomers(companyId);
+        const dbIds = new Set(result.data.map(c => c.id));
+        const uniqueDemoCustomers = demoCustomers.filter(
+          d => !dbIds.has(d.id)
+        ) as unknown as Customer[];
+
+        let mergedData = [...uniqueDemoCustomers, ...result.data];
+
+        // フィルタリング
+        if (search) {
+          const searchLower = search.toLowerCase();
+          mergedData = mergedData.filter(c =>
+            c.name.toLowerCase().includes(searchLower) ||
+            c.email?.toLowerCase().includes(searchLower) ||
+            c.phone?.includes(search)
+          );
+        }
+        if (rank && rank !== "all") {
+          mergedData = mergedData.filter(c => c.rank === rank);
+        }
+
+        // 新しい順にソート
+        mergedData.sort((a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+
+        return {
+          data: mergedData,
+          pagination: {
+            page: 1,
+            limit: mergedData.length,
+            total: mergedData.length,
+            totalPages: 1,
+          },
+        };
+      } catch {
+        // エラー時はデモデータのみ
+        let demoCustomers = getDemoCustomers(companyId) as unknown as Customer[];
+
+        // フィルタリング
+        if (search) {
+          const searchLower = search.toLowerCase();
+          demoCustomers = demoCustomers.filter(c =>
+            c.name.toLowerCase().includes(searchLower) ||
+            c.email?.toLowerCase().includes(searchLower) ||
+            c.phone?.includes(search)
+          );
+        }
+        if (rank && rank !== "all") {
+          demoCustomers = demoCustomers.filter(c => c.rank === rank);
+        }
+
+        return {
+          data: demoCustomers,
+          pagination: {
+            page: 1,
+            limit: demoCustomers.length,
+            total: demoCustomers.length,
+            totalPages: 1,
+          },
+        };
+      }
+    },
     enabled: enabled && !!companyId,
   });
 }
@@ -57,8 +129,15 @@ export function useCustomers({
 export function useCustomer(id: string, enabled = true) {
   return useQuery({
     queryKey: customerKeys.detail(id),
-    queryFn: () =>
-      apiClient.get<SingleResponse<CustomerDetail>>(`/customers/${id}`),
+    queryFn: async () => {
+      // まずデモデータをチェック
+      const demoCustomer = getDemoCustomer(id);
+      if (demoCustomer) {
+        return { data: demoCustomer as unknown as CustomerDetail };
+      }
+
+      return apiClient.get<SingleResponse<CustomerDetail>>(`/customers/${id}`);
+    },
     enabled: enabled && !!id,
   });
 }
@@ -68,8 +147,23 @@ export function useCreateCustomer() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: CreateCustomerRequest) =>
-      apiClient.post<SingleResponse<Customer>>("/customers", data),
+    mutationFn: async (data: CreateCustomerRequest) => {
+      try {
+        return await apiClient.post<SingleResponse<Customer>>("/customers", data);
+      } catch {
+        // APIエラー時はデモストレージに保存
+        console.log("API unavailable, saving customer to demo storage");
+        const customer = createDemoCustomer({
+          companyId: data.companyId,
+          name: data.name,
+          type: data.type,
+          email: data.email,
+          phone: data.phone,
+          address: data.address,
+        });
+        return { data: customer as unknown as Customer };
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
     },

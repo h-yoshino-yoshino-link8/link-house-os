@@ -10,6 +10,11 @@ import type {
   CreateHouseRequest,
   UpdateHouseRequest,
 } from "@/lib/api/types";
+import {
+  getDemoHouses,
+  createDemoHouse,
+  DemoHouse,
+} from "@/lib/demo-storage";
 
 // クエリキー
 export const houseKeys = {
@@ -53,16 +58,72 @@ export function useHouses({
       page,
       limit,
     }),
-    queryFn: () =>
-      apiClient.get<PaginatedResponse<House>>("/houses", {
-        companyId,
-        customerId,
-        healthScoreMin,
-        healthScoreMax,
-        search,
-        page,
-        limit,
-      }),
+    queryFn: async () => {
+      try {
+        const result = await apiClient.get<PaginatedResponse<House>>("/houses", {
+          companyId,
+          customerId,
+          healthScoreMin,
+          healthScoreMax,
+          search,
+          page,
+          limit,
+        });
+
+        // デモデータとマージ
+        const demoHouses = getDemoHouses(companyId, customerId);
+        const dbIds = new Set(result.data.map(h => h.id));
+        const uniqueDemoHouses = demoHouses.filter(
+          d => !dbIds.has(d.id)
+        ) as unknown as House[];
+
+        let mergedData = [...uniqueDemoHouses, ...result.data];
+
+        // フィルタリング
+        if (search) {
+          const searchLower = search.toLowerCase();
+          mergedData = mergedData.filter(h =>
+            h.address.toLowerCase().includes(searchLower)
+          );
+        }
+
+        // 新しい順にソート
+        mergedData.sort((a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+
+        return {
+          data: mergedData,
+          pagination: {
+            page: 1,
+            limit: mergedData.length,
+            total: mergedData.length,
+            totalPages: 1,
+          },
+        };
+      } catch {
+        // エラー時はデモデータのみ
+        let demoHouses = getDemoHouses(companyId, customerId) as unknown as House[];
+
+        // フィルタリング
+        if (search) {
+          const searchLower = search.toLowerCase();
+          demoHouses = demoHouses.filter(h =>
+            h.address.toLowerCase().includes(searchLower)
+          );
+        }
+
+        return {
+          data: demoHouses,
+          pagination: {
+            page: 1,
+            limit: demoHouses.length,
+            total: demoHouses.length,
+            totalPages: 1,
+          },
+        };
+      }
+    },
     enabled: enabled && !!companyId,
   });
 }
@@ -82,8 +143,23 @@ export function useCreateHouse() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: CreateHouseRequest) =>
-      apiClient.post<SingleResponse<House>>("/houses", data),
+    mutationFn: async (data: CreateHouseRequest) => {
+      try {
+        return await apiClient.post<SingleResponse<House>>("/houses", data);
+      } catch {
+        // APIエラー時はデモストレージに保存
+        console.log("API unavailable, saving house to demo storage");
+        const house = createDemoHouse({
+          companyId: data.companyId,
+          customerId: data.customerId,
+          address: data.address,
+          structureType: data.structureType,
+          builtYear: data.builtYear,
+          floorArea: data.totalArea,
+        });
+        return { data: house as unknown as House };
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: houseKeys.lists() });
     },

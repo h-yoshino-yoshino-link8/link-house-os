@@ -731,6 +731,11 @@ export default function ProjectDetailPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="sm" asChild>
+                              <Link href={`/invoices/${invoice.id}`}>
+                                <ExternalLink className="h-4 w-4" />
+                              </Link>
+                            </Button>
                             <InvoicePDFButton
                               invoice={{
                                 invoiceNumber: invoice.invoiceNumber,

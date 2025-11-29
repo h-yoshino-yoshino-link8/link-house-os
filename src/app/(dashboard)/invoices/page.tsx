@@ -242,7 +242,7 @@ export default function InvoicesPage() {
                       </TableCell>
                       <TableCell>
                         <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/projects/${invoice.projectId}?tab=invoices`}>
+                          <Link href={`/invoices/${invoice.id}`}>
                             <ExternalLink className="h-4 w-4" />
                           </Link>
                         </Button>

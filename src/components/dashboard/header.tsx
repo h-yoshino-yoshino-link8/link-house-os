@@ -2,28 +2,17 @@
 
 import { useAppStore } from "@/stores/app-store";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Bell,
   Building,
   HelpCircle,
   Search,
-  User,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { UserButton } from "@clerk/nextjs";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 
 export function Header() {
-  const { company, notifications, unreadCount } = useAppStore();
+  const { company } = useAppStore();
 
   return (
     <header className="flex h-16 items-center justify-between border-b bg-background px-6">
@@ -47,52 +36,7 @@ export function Header() {
         </div>
 
         {/* Notifications */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5" />
-              {unreadCount > 0 && (
-                <Badge
-                  variant="destructive"
-                  className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
-                >
-                  {unreadCount > 9 ? "9+" : unreadCount}
-                </Badge>
-              )}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel>通知</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {notifications.length === 0 ? (
-              <div className="py-4 text-center text-sm text-muted-foreground">
-                新しい通知はありません
-              </div>
-            ) : (
-              notifications.slice(0, 5).map((notification) => (
-                <DropdownMenuItem key={notification.id} className="flex flex-col items-start gap-1 py-3">
-                  <div className="flex items-center gap-2">
-                    {!notification.read && (
-                      <span className="h-2 w-2 rounded-full bg-primary" />
-                    )}
-                    <span className="font-medium">{notification.title}</span>
-                  </div>
-                  <span className="text-xs text-muted-foreground">
-                    {notification.message}
-                  </span>
-                </DropdownMenuItem>
-              ))
-            )}
-            {notifications.length > 5 && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="justify-center">
-                  すべての通知を見る
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <NotificationBell />
 
         {/* Help */}
         <Button variant="ghost" size="icon">

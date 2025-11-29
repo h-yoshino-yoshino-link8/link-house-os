@@ -129,3 +129,16 @@ export function useDeleteSchedule() {
     },
   });
 }
+
+// 工程進捗更新（部分更新）
+export function useUpdateScheduleProgress() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, progress }: { id: string; progress: number }) =>
+      apiClient.put<{ data: ScheduleItem }>(`/schedules/${id}`, { progress }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: scheduleKeys.lists() });
+    },
+  });
+}

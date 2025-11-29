@@ -2,6 +2,14 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
+import {
+  getDemoInvoices,
+  getDemoInvoice,
+  createDemoInvoice,
+  updateDemoInvoice,
+  recordDemoPayment,
+  DemoInvoice,
+} from "@/lib/demo-storage";
 
 // ============================================
 // Types
@@ -120,8 +128,54 @@ export function useInvoices(params: UseInvoicesParams) {
   return useQuery({
     queryKey: invoiceKeys.list(queryParams),
     queryFn: async () => {
-      const response = await apiClient.get<PaginatedResponse<Invoice>>("/invoices", queryParams);
-      return response;
+      try {
+        const response = await apiClient.get<PaginatedResponse<Invoice>>("/invoices", queryParams);
+
+        // デモデータとマージ
+        const demoInvoices = getDemoInvoices(
+          params.companyId,
+          params.projectId,
+          params.customerId,
+          params.status
+        );
+        const dbIds = new Set(response.data.map(i => i.id));
+        const uniqueDemoInvoices = demoInvoices.filter(
+          d => !dbIds.has(d.id)
+        ) as unknown as Invoice[];
+
+        const mergedData = [...uniqueDemoInvoices, ...response.data];
+        mergedData.sort((a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+
+        return {
+          data: mergedData,
+          pagination: {
+            page: 1,
+            limit: mergedData.length,
+            total: mergedData.length,
+            totalPages: 1,
+          },
+        };
+      } catch {
+        // エラー時はデモデータのみ
+        const demoInvoices = getDemoInvoices(
+          params.companyId,
+          params.projectId,
+          params.customerId,
+          params.status
+        ) as unknown as Invoice[];
+
+        return {
+          data: demoInvoices,
+          pagination: {
+            page: 1,
+            limit: demoInvoices.length,
+            total: demoInvoices.length,
+            totalPages: 1,
+          },
+        };
+      }
     },
     enabled: !!params.companyId,
   });
@@ -131,6 +185,12 @@ export function useInvoice(id: string) {
   return useQuery({
     queryKey: invoiceKeys.detail(id),
     queryFn: async () => {
+      // まずデモデータをチェック
+      const demoInvoice = getDemoInvoice(id);
+      if (demoInvoice) {
+        return demoInvoice as unknown as Invoice;
+      }
+
       const response = await apiClient.get<ApiResponse<Invoice>>(`/invoices/${id}`);
       return response.data;
     },
@@ -162,8 +222,26 @@ export function useCreateInvoice() {
 
   return useMutation({
     mutationFn: async (data: CreateInvoiceData) => {
-      const response = await apiClient.post<ApiResponse<Invoice>>("/invoices", data);
-      return response.data;
+      try {
+        const response = await apiClient.post<ApiResponse<Invoice>>("/invoices", data);
+        return response.data;
+      } catch {
+        // APIエラー時はデモストレージに保存
+        console.log("API unavailable, saving invoice to demo storage");
+        const invoice = createDemoInvoice({
+          companyId: data.companyId,
+          projectId: data.projectId,
+          customerId: data.customerId,
+          title: data.title,
+          issueDate: data.issueDate,
+          dueDate: data.dueDate,
+          taxRate: data.taxRate,
+          notes: data.notes,
+          internalMemo: data.internalMemo,
+          details: data.details,
+        });
+        return invoice as unknown as Invoice;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: invoiceKeys.lists() });
@@ -193,6 +271,16 @@ export function useUpdateInvoice(id: string) {
 
   return useMutation({
     mutationFn: async (data: UpdateInvoiceData) => {
+      // デモデータかチェック
+      const demoInvoice = getDemoInvoice(id);
+      if (demoInvoice) {
+        const updated = updateDemoInvoice(id, data as Partial<DemoInvoice>);
+        if (updated) {
+          return updated as unknown as Invoice;
+        }
+        throw new Error("Failed to update demo invoice");
+      }
+
       const response = await apiClient.put<ApiResponse<Invoice>>(`/invoices/${id}`, data);
       return response.data;
     },
@@ -245,6 +333,25 @@ export function useRecordPayment(invoiceId: string) {
 
   return useMutation({
     mutationFn: async (data: RecordPaymentData) => {
+      // デモデータかチェック
+      const demoInvoice = getDemoInvoice(invoiceId);
+      if (demoInvoice) {
+        const result = recordDemoPayment(invoiceId, {
+          paymentDate: data.paymentDate,
+          amount: data.amount,
+          method: data.method,
+          reference: data.reference,
+          notes: data.notes,
+        });
+        if (result) {
+          return {
+            payment: result.payment as unknown as Payment,
+            invoice: result.invoice as unknown as Invoice,
+          };
+        }
+        throw new Error("Failed to record demo payment");
+      }
+
       const response = await apiClient.post<ApiResponse<{ payment: Payment; invoice: Invoice }>>(
         `/invoices/${invoiceId}/payments`,
         data

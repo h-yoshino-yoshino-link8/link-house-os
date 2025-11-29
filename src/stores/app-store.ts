@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { Company, User } from "@/types";
+import { initializeSampleDemoData } from "@/lib/demo-storage";
 
 // 開発用デモ会社ID（本番環境ではClerk認証から取得）
 export const DEMO_COMPANY_ID = "company-demo-001";
@@ -101,6 +102,10 @@ export const useAppStore = create<AppState>()(
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);
+        // デモモードの場合、サンプルデータを初期化
+        if (typeof window !== "undefined") {
+          initializeSampleDemoData(DEMO_COMPANY_ID);
+        }
       },
     }
   )

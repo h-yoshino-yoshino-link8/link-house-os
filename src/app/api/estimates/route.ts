@@ -176,6 +176,9 @@ export async function POST(request: NextRequest) {
           ? {
               create: details.map((detail: {
                 sortOrder?: number;
+                parentId?: string | null;
+                level?: number;
+                isCategory?: boolean;
                 name: string;
                 specification?: string;
                 quantity?: number;
@@ -190,6 +193,9 @@ export async function POST(request: NextRequest) {
                 internalMemo?: string;
               }, index: number) => ({
                 sortOrder: detail.sortOrder ?? index,
+                parentId: detail.parentId || null,
+                level: detail.level ?? 0,
+                isCategory: detail.isCategory ?? false,
                 name: detail.name,
                 specification: detail.specification,
                 quantity: detail.quantity || 1,

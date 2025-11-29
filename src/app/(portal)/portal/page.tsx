@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Home,
   Activity,
@@ -19,6 +20,7 @@ import {
   Clock,
   TrendingUp,
   Wallet,
+  Loader2,
 } from "lucide-react";
 import {
   RadarChart,
@@ -30,11 +32,13 @@ import {
 } from "recharts";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
+import { usePortalData } from "@/hooks/use-portal";
 
-// デモデータ（実際のAPIから取得予定）
-const portalData = {
+// デモデータ（トークンがない場合のフォールバック）
+const demoData = {
   customer: {
-    name: "山田太郎",
+    id: "demo",
+    name: "デモ太郎",
     rank: "gold",
     points: 2500,
   },
@@ -58,19 +62,18 @@ const portalData = {
     { id: "1", level: "high", message: "給湯器：交換時期が近づいています", component: "設備" },
     { id: "2", level: "medium", message: "外壁塗装：2年以内に再塗装を推奨", component: "外壁" },
   ],
-  upcomingMaintenance: [
-    { id: "1", date: new Date("2025-05-10"), description: "屋根定期点検", status: "scheduled" },
-    { id: "2", date: new Date("2025-08-20"), description: "外壁塗装", status: "recommended" },
+  recentEstimates: [
+    { id: "1", estimateNumber: "EST-2024-025", title: "バスルームリフォーム", submittedAt: new Date(), validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), amount: 1850000, status: "submitted" },
   ],
   recentProjects: [
-    { id: "1", title: "内装リフォーム工事", completedAt: new Date("2022-03-15"), hasNft: true },
-    { id: "2", title: "屋根塗装工事", completedAt: new Date("2020-05-10"), hasNft: true },
+    { id: "1", title: "内装リフォーム工事", status: "completed", completedAt: new Date("2022-03-15"), hasNft: true },
+    { id: "2", title: "屋根塗装工事", status: "completed", completedAt: new Date("2020-05-10"), hasNft: true },
   ],
   savings: {
     plan: "standard",
     balance: 156000,
+    bonusBalance: 5000,
     monthlyAmount: 5000,
-    nextPayment: new Date("2025-01-15"),
   },
   nftCount: 3,
 };
@@ -100,20 +103,85 @@ const rankLabels: Record<string, { label: string; color: string }> = {
 };
 
 export default function PortalDashboard() {
-  const healthLabel = getHealthLabel(portalData.house.healthScore);
-  const rankInfo = rankLabels[portalData.customer.rank];
+  const searchParams = useSearchParams();
+  const token = searchParams.get("token");
+
+  const { data: apiData, isLoading, error } = usePortalData(token);
+
+  // APIデータがあればそれを使用、なければデモデータ
+  const portalData = apiData || demoData;
+
+  const healthLabel = getHealthLabel(portalData.house?.healthScore || 0);
+  const rankInfo = rankLabels[portalData.customer.rank] || rankLabels.member;
+
+  // トークン付きリンク
+  const getHref = (href: string) => token ? `${href}?token=${token}` : href;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-16 w-full" />
+        <div className="grid gap-4 md:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-32" />
+          ))}
+        </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Skeleton className="h-80" />
+          <Skeleton className="h-80" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error && token) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
+        <AlertTriangle className="h-12 w-12 text-orange-500 mb-4" />
+        <h2 className="text-xl font-bold mb-2">アクセスエラー</h2>
+        <p className="text-muted-foreground mb-4">
+          ポータルへのアクセスに問題があります。<br />
+          リンクが正しいかご確認ください。
+        </p>
+        <Button variant="outline" onClick={() => window.location.reload()}>
+          再読み込み
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
+      {/* Demo Mode Banner */}
+      {!token && (
+        <Card className="border-blue-200 bg-blue-50/50">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
+                <Home className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="font-medium text-blue-800">デモモードで表示中</p>
+                <p className="text-sm text-blue-700">
+                  実際のポータルは、工務店から送られるリンクからアクセスできます
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Welcome Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-bold">
             {portalData.customer.name}様のお家
           </h1>
-          <p className="text-muted-foreground">
-            {portalData.house.address}
-          </p>
+          {portalData.house && (
+            <p className="text-muted-foreground">
+              {portalData.house.address}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <Badge className={rankInfo.color}>{rankInfo.label}</Badge>
@@ -164,12 +232,12 @@ export default function PortalDashboard() {
           </CardHeader>
           <CardContent>
             <div className="flex items-end gap-2">
-              <span className={`text-3xl font-bold ${getHealthColor(portalData.house.healthScore)}`}>
-                {portalData.house.healthScore}
+              <span className={`text-3xl font-bold ${getHealthColor(portalData.house?.healthScore || 0)}`}>
+                {portalData.house?.healthScore || 0}
               </span>
               <Badge className={healthLabel.color}>{healthLabel.label}</Badge>
             </div>
-            <Progress value={portalData.house.healthScore} className="mt-2 h-2" />
+            <Progress value={portalData.house?.healthScore || 0} className="mt-2 h-2" />
           </CardContent>
         </Card>
 
@@ -182,10 +250,13 @@ export default function PortalDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {new Date().getFullYear() - portalData.house.builtYear}年
+              {portalData.house?.builtYear
+                ? `${new Date().getFullYear() - portalData.house.builtYear}年`
+                : "-"}
             </div>
             <p className="text-xs text-muted-foreground">
-              {portalData.house.builtYear}年築 / {portalData.house.totalArea}㎡
+              {portalData.house?.builtYear ? `${portalData.house.builtYear}年築` : ""}
+              {portalData.house?.totalArea ? ` / ${portalData.house.totalArea}㎡` : ""}
             </p>
           </CardContent>
         </Card>
@@ -212,10 +283,10 @@ export default function PortalDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ¥{portalData.savings.balance.toLocaleString()}
+              ¥{(portalData.savings?.balance || 0).toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
-              月額¥{portalData.savings.monthlyAmount.toLocaleString()}
+              月額¥{(portalData.savings?.monthlyAmount || 0).toLocaleString()}
             </p>
           </CardContent>
         </Card>
@@ -234,65 +305,73 @@ export default function PortalDashboard() {
           </CardHeader>
           <CardContent>
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <RadarChart data={portalData.componentScores}>
-                  <PolarGrid />
-                  <PolarAngleAxis dataKey="subject" />
-                  <PolarRadiusAxis angle={30} domain={[0, 100]} />
-                  <Radar
-                    name="スコア"
-                    dataKey="score"
-                    stroke="#3b82f6"
-                    fill="#3b82f6"
-                    fillOpacity={0.5}
-                  />
-                </RadarChart>
-              </ResponsiveContainer>
+              {portalData.componentScores.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart data={portalData.componentScores}>
+                    <PolarGrid />
+                    <PolarAngleAxis dataKey="subject" />
+                    <PolarRadiusAxis angle={30} domain={[0, 100]} />
+                    <Radar
+                      name="スコア"
+                      dataKey="score"
+                      stroke="#3b82f6"
+                      fill="#3b82f6"
+                      fillOpacity={0.5}
+                    />
+                  </RadarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  部材データがありません
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Upcoming Maintenance */}
+        {/* Recent Estimates */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              メンテナンス予定
+              <FileText className="h-5 w-5" />
+              最新のお見積り
             </CardTitle>
-            <CardDescription>今後のメンテナンス予定と推奨</CardDescription>
+            <CardDescription>検討中のお見積り</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {portalData.upcomingMaintenance.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between rounded-lg border p-3"
-              >
-                <div className="flex items-center gap-3">
-                  {item.status === "scheduled" ? (
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                  ) : (
-                    <Clock className="h-5 w-5 text-yellow-600" />
-                  )}
-                  <div>
-                    <p className="font-medium">{item.description}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {format(item.date, "yyyy年M月d日", { locale: ja })}
-                    </p>
+            {portalData.recentEstimates.length > 0 ? (
+              <>
+                {portalData.recentEstimates.slice(0, 3).map((estimate) => (
+                  <div
+                    key={estimate.id}
+                    className="flex items-center justify-between rounded-lg border p-3"
+                  >
+                    <div>
+                      <p className="font-medium">{estimate.title}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {estimate.estimateNumber}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold">¥{estimate.amount.toLocaleString()}</p>
+                      <Badge variant={estimate.status === "submitted" ? "default" : "secondary"}>
+                        {estimate.status === "submitted" ? "検討中" : "成約済"}
+                      </Badge>
+                    </div>
                   </div>
-                </div>
-                <Badge
-                  variant={item.status === "scheduled" ? "default" : "secondary"}
-                >
-                  {item.status === "scheduled" ? "予約済" : "推奨"}
-                </Badge>
+                ))}
+                <Button variant="outline" className="w-full" asChild>
+                  <Link href={getHref("/portal/estimates")}>
+                    すべて見る
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              </>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                お見積りはまだありません
               </div>
-            ))}
-            <Button variant="outline" className="w-full" asChild>
-              <Link href="/portal/maintenance">
-                すべて見る
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
+            )}
           </CardContent>
         </Card>
 
@@ -306,31 +385,41 @@ export default function PortalDashboard() {
             <CardDescription>完了した工事履歴</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {portalData.recentProjects.map((project) => (
-              <div
-                key={project.id}
-                className="flex items-center justify-between rounded-lg border p-3"
-              >
-                <div>
-                  <p className="font-medium">{project.title}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {format(project.completedAt, "yyyy年M月d日", { locale: ja })}
-                  </p>
-                </div>
-                {project.hasNft && (
-                  <Badge className="bg-purple-100 text-purple-800">
-                    <Shield className="mr-1 h-3 w-3" />
-                    NFT発行済
-                  </Badge>
-                )}
+            {portalData.recentProjects.length > 0 ? (
+              <>
+                {portalData.recentProjects.map((project) => (
+                  <div
+                    key={project.id}
+                    className="flex items-center justify-between rounded-lg border p-3"
+                  >
+                    <div>
+                      <p className="font-medium">{project.title}</p>
+                      {project.completedAt && (
+                        <p className="text-sm text-muted-foreground">
+                          {format(new Date(project.completedAt), "yyyy年M月d日", { locale: ja })}
+                        </p>
+                      )}
+                    </div>
+                    {project.hasNft && (
+                      <Badge className="bg-purple-100 text-purple-800">
+                        <Shield className="mr-1 h-3 w-3" />
+                        NFT発行済
+                      </Badge>
+                    )}
+                  </div>
+                ))}
+                <Button variant="outline" className="w-full" asChild>
+                  <Link href={getHref("/portal/certificates")}>
+                    施工証明を見る
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              </>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                工事履歴はまだありません
               </div>
-            ))}
-            <Button variant="outline" className="w-full" asChild>
-              <Link href="/portal/certificates">
-                施工証明を見る
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
+            )}
           </CardContent>
         </Card>
 
@@ -344,29 +433,41 @@ export default function PortalDashboard() {
             <CardDescription>メンテナンス積立の状況</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">現在の残高</span>
-                <span className="text-2xl font-bold text-blue-700">
-                  ¥{portalData.savings.balance.toLocaleString()}
-                </span>
+            {portalData.savings ? (
+              <>
+                <div className="rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">現在の残高</span>
+                    <span className="text-2xl font-bold text-blue-700">
+                      ¥{portalData.savings.balance.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">プラン</span>
+                    <Badge variant="outline">
+                      {portalData.savings.plan === "light" ? "ライト" :
+                       portalData.savings.plan === "standard" ? "スタンダード" : "プレミアム"}
+                    </Badge>
+                  </div>
+                  {portalData.savings.bonusBalance > 0 && (
+                    <div className="mt-2 flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">ボーナス残高</span>
+                      <span className="text-green-600">+¥{portalData.savings.bonusBalance.toLocaleString()}</span>
+                    </div>
+                  )}
+                </div>
+                <Button variant="outline" className="w-full" asChild>
+                  <Link href={getHref("/portal/savings")}>
+                    積立履歴を見る
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              </>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                積立契約はまだありません
               </div>
-              <div className="mt-2 flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">プラン</span>
-                <Badge variant="outline">
-                  {portalData.savings.plan === "light" ? "ライト" :
-                   portalData.savings.plan === "standard" ? "スタンダード" : "プレミアム"}
-                </Badge>
-              </div>
-              <div className="mt-2 flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">次回引落日</span>
-                <span>{format(portalData.savings.nextPayment, "M月d日", { locale: ja })}</span>
-              </div>
-            </div>
-            <Button variant="outline" className="w-full">
-              積立履歴を見る
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -386,9 +487,11 @@ export default function PortalDashboard() {
               <FileText className="h-6 w-6" />
               <span>見積を依頼</span>
             </Button>
-            <Button variant="outline" className="h-auto flex-col gap-2 py-4">
-              <Shield className="h-6 w-6" />
-              <span>NFTを確認</span>
+            <Button variant="outline" className="h-auto flex-col gap-2 py-4" asChild>
+              <Link href={getHref("/portal/certificates")}>
+                <Shield className="h-6 w-6" />
+                <span>NFTを確認</span>
+              </Link>
             </Button>
             <Button variant="outline" className="h-auto flex-col gap-2 py-4">
               <Home className="h-6 w-6" />

@@ -189,7 +189,10 @@ export interface EstimateDetail extends Estimate {
 export interface EstimateDetailItem {
   id: string;
   estimateId: string;
+  parentId?: string | null;
   sortOrder: number;
+  level: number;
+  isCategory: boolean;
   name: string;
   specification: string | null;
   quantity: number;
@@ -201,6 +204,8 @@ export interface EstimateDetailItem {
   profitRate: number;
   priceUnit: number;
   priceTotal: number;
+  internalMemo?: string | null;
+  children?: EstimateDetailItem[];
 }
 
 // 案件
@@ -390,6 +395,9 @@ export interface CreateEstimateRequest {
 
 export interface CreateEstimateDetailRequest {
   sortOrder?: number;
+  parentId?: string;
+  level?: number;
+  isCategory?: boolean;
   name: string;
   specification?: string;
   quantity?: number;

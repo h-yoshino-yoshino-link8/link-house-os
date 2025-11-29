@@ -61,6 +61,7 @@ import {
 import { ESTIMATE_STATUS } from "@/constants";
 import { formatDate } from "@/lib/utils/date";
 import { useEstimate, useUpdateEstimate, useDeleteEstimate, useConfirmOrder } from "@/hooks/use-estimates";
+import type { EstimateDetailItem } from "@/lib/api/types";
 import { useEstimateStore } from "@/stores/estimate-store";
 import { PDFDownloadButton } from "@/components/estimates/pdf-download-button";
 import { toast } from "sonner";
@@ -211,24 +212,14 @@ export default function EstimateDetailPage() {
     );
   }
 
-  // Type for estimate detail items from API
-  interface EstimateDetailItem {
-    id: string;
-    sortOrder: number;
-    name: string;
-    specification?: string | null;
-    quantity: number;
-    unit?: string | null;
-    costMaterial: number;
-    costLabor: number;
-    costUnit: number;
-    costTotal: number;
-    profitRate: number;
-    priceUnit: number;
-    priceTotal: number;
-    internalMemo?: string | null;
-    children?: EstimateDetailItem[];
-  }
+  // 階層レベルに応じた色
+  const levelColors = [
+    "bg-blue-50", // 大項目
+    "bg-green-50", // 中項目
+    "", // 小項目（通常行）
+  ];
+
+  const levelLabels = ["大項目", "中項目", "小項目"];
 
   // 明細を再計算（DBに¥0で保存されている場合でも正しく表示）
   const calculatePriceFromCost = (cost: number, profitRate: number): number => {
@@ -237,11 +228,84 @@ export default function EstimateDetailPage() {
   };
 
   const rawDetails = (estimate.details || []) as EstimateDetailItem[];
-  const details = rawDetails.map(d => {
+
+  // 階層構造をフラット化して表示用配列を作成
+  const flattenDetails = (items: EstimateDetailItem[], parentExpanded = true): EstimateDetailItem[] => {
+    const result: EstimateDetailItem[] = [];
+    // まずルートレベル（parentIdがnull）を取得
+    const rootItems = items.filter(d => !d.parentId);
+
+    const addWithChildren = (item: EstimateDetailItem) => {
+      result.push(item);
+      // 子要素を追加
+      const children = items.filter(d => d.parentId === item.id);
+      children.sort((a, b) => a.sortOrder - b.sortOrder);
+      children.forEach(child => addWithChildren(child));
+    };
+
+    rootItems.sort((a, b) => a.sortOrder - b.sortOrder);
+    rootItems.forEach(item => addWithChildren(item));
+    return result;
+  };
+
+  const details = flattenDetails(rawDetails).map(d => {
     const costMaterial = Number(d.costMaterial || 0);
     const costLabor = Number(d.costLabor || 0);
     const quantity = Number(d.quantity || 1);
     const profitRate = Number(d.profitRate || 25);
+    const level = Number(d.level || 0);
+    const isCategory = Boolean(d.isCategory);
+
+    // カテゴリ行の場合は子要素の合計を計算
+    if (isCategory) {
+      const children = rawDetails.filter(child => child.parentId === d.id);
+      let childCostTotal = 0;
+      let childPriceTotal = 0;
+
+      const calcChildTotals = (items: EstimateDetailItem[]) => {
+        items.forEach(child => {
+          if (child.isCategory) {
+            // 再帰的に子カテゴリの子要素を計算
+            const grandChildren = rawDetails.filter(gc => gc.parentId === child.id);
+            calcChildTotals(grandChildren);
+          } else {
+            const cCostMaterial = Number(child.costMaterial || 0);
+            const cCostLabor = Number(child.costLabor || 0);
+            const cQuantity = Number(child.quantity || 1);
+            const cProfitRate = Number(child.profitRate || 25);
+            const cCostUnit = cCostMaterial + cCostLabor;
+            const cCostTotal = cCostUnit * cQuantity;
+            const cPriceUnit = calculatePriceFromCost(cCostUnit, cProfitRate);
+            const cPriceTotal = cPriceUnit * cQuantity;
+            childCostTotal += cCostTotal;
+            childPriceTotal += cPriceTotal;
+          }
+        });
+      };
+
+      calcChildTotals(children);
+
+      return {
+        id: d.id,
+        sortOrder: d.sortOrder,
+        level,
+        isCategory,
+        parentId: d.parentId,
+        name: d.name,
+        specification: d.specification,
+        unit: d.unit,
+        internalMemo: d.internalMemo,
+        children: d.children,
+        costMaterial: 0,
+        costLabor: 0,
+        quantity: 1,
+        costUnit: 0,
+        costTotal: childCostTotal,
+        profitRate: 0,
+        priceUnit: 0,
+        priceTotal: childPriceTotal,
+      };
+    }
 
     // 原価計算（材料費 + 労務費 = 原価単価）
     const costUnit = costMaterial + costLabor;
@@ -256,6 +320,9 @@ export default function EstimateDetailPage() {
     return {
       id: d.id,
       sortOrder: d.sortOrder,
+      level,
+      isCategory,
+      parentId: d.parentId,
       name: d.name,
       specification: d.specification,
       unit: d.unit,
@@ -273,9 +340,10 @@ export default function EstimateDetailPage() {
     };
   });
 
-  // 合計を再計算
-  const costTotal = details.reduce((sum, d) => sum + d.costTotal, 0);
-  const subtotal = details.reduce((sum, d) => sum + d.priceTotal, 0);
+  // 合計を再計算（カテゴリ行は集計用なので、非カテゴリ行のみを合計）
+  const nonCategoryDetails = details.filter(d => !d.isCategory);
+  const costTotal = nonCategoryDetails.reduce((sum, d) => sum + d.costTotal, 0);
+  const subtotal = nonCategoryDetails.reduce((sum, d) => sum + d.priceTotal, 0);
   const tax = Math.floor(subtotal * (Number(estimate.taxRate || 10) / 100));
   const total = subtotal + tax;
   const profit = subtotal - costTotal;
@@ -588,24 +656,58 @@ export default function EstimateDetailPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                details.map((detail, index) => (
-                  <TableRow key={detail.id}>
-                    <TableCell className="text-muted-foreground">{index + 1}</TableCell>
-                    <TableCell className="font-medium">{detail.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{detail.specification || "-"}</TableCell>
-                    <TableCell className="text-right">{detail.quantity}</TableCell>
-                    <TableCell>{detail.unit || "-"}</TableCell>
-                    <TableCell className="text-right">¥{Math.round(detail.costUnit).toLocaleString()}</TableCell>
-                    <TableCell className="text-right">¥{Math.round(detail.costTotal).toLocaleString()}</TableCell>
-                    <TableCell className="text-right">
-                      <span className={Number(detail.profitRate) >= 25 ? "text-green-600" : "text-yellow-600"}>
-                        {Number(detail.profitRate).toFixed(0)}%
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">¥{Math.round(detail.priceUnit).toLocaleString()}</TableCell>
-                    <TableCell className="text-right font-medium">¥{Math.round(detail.priceTotal).toLocaleString()}</TableCell>
-                  </TableRow>
-                ))
+                details.map((detail, index) => {
+                  const indent = (detail.level || 0) * 16;
+
+                  // カテゴリ行の場合
+                  if (detail.isCategory) {
+                    return (
+                      <TableRow key={detail.id} className={levelColors[detail.level] || ""}>
+                        <TableCell className="text-muted-foreground">{index + 1}</TableCell>
+                        <TableCell colSpan={5}>
+                          <div className="flex items-center gap-2" style={{ paddingLeft: indent }}>
+                            <Badge variant="outline" className="text-xs shrink-0">
+                              {levelLabels[detail.level] || "カテゴリ"}
+                            </Badge>
+                            <span className="font-bold">{detail.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          ¥{Math.round(detail.costTotal).toLocaleString()}
+                        </TableCell>
+                        <TableCell></TableCell>
+                        <TableCell></TableCell>
+                        <TableCell className="text-right font-bold">
+                          ¥{Math.round(detail.priceTotal).toLocaleString()}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  }
+
+                  // 通常の明細行
+                  return (
+                    <TableRow key={detail.id}>
+                      <TableCell className="text-muted-foreground">{index + 1}</TableCell>
+                      <TableCell>
+                        <div style={{ paddingLeft: indent }} className="font-medium">
+                          {detail.name}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{detail.specification || "-"}</TableCell>
+                      <TableCell className="text-right">{detail.quantity}</TableCell>
+                      <TableCell>{detail.unit || "-"}</TableCell>
+                      <TableCell className="text-right">¥{Math.round(detail.costUnit).toLocaleString()}</TableCell>
+                      <TableCell className="text-right">¥{Math.round(detail.costTotal).toLocaleString()}</TableCell>
+                      <TableCell className="text-right">
+                        <span className={Number(detail.profitRate) >= 25 ? "text-green-600" : "text-yellow-600"}>
+                          {Number(detail.profitRate).toFixed(0)}%
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">¥{Math.round(detail.priceUnit).toLocaleString()}</TableCell>
+                      <TableCell className="text-right font-medium">¥{Math.round(detail.priceTotal).toLocaleString()}</TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
             <TableFooter>

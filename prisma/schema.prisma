@@ -19,10 +19,32 @@ datasource db {
 model Company {
   id                 String   @id @default(cuid())
   name               String
-  licenseNumber      String?  @map("license_number")
+  nameKana           String?  @map("name_kana")
+  representativeName String?  @map("representative_name")
+  establishedYear    Int?     @map("established_year")
+  businessDescription String? @map("business_description")
+
+  // 連絡先
+  postalCode         String?  @map("postal_code")
   address            String?
   phone              String?
+  fax                String?
   email              String?
+  website            String?
+
+  // 許可・資格
+  licenseNumber      String?  @map("license_number")
+  licenseExpiry      DateTime? @map("license_expiry")
+  qualifications     String?
+  insurance          String?
+
+  // 振込先情報（JSON）
+  bankInfo           Json?    @map("bank_info")
+
+  // 書類設定（JSON）
+  documentSettings   Json?    @map("document_settings")
+
+  // ロゴ・印影
   logoUrl            String?  @map("logo_url")
   sealUrl            String?  @map("seal_url")
 
@@ -111,6 +133,7 @@ model Customer {
 
   // ポータルログイン用
   portalUserId     String?  @map("portal_user_id")
+  portalAccessToken String? @unique @map("portal_access_token")
 
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
@@ -351,6 +374,8 @@ model EstimateDetail {
   children      EstimateDetail[] @relation("DetailHierarchy")
 
   sortOrder     Int      @default(0) @map("sort_order")
+  level         Int      @default(0) // 0: 大項目, 1: 中項目, 2: 小項目
+  isCategory    Boolean  @default(false) @map("is_category") // カテゴリ行フラグ
   name          String
   specification String?
 
@@ -789,6 +814,39 @@ model Referral {
   convertedAt      DateTime? @map("converted_at")
 
   @@map("referrals")
+}
+
+// ============================================
+// 通知・リマインダー
+// ============================================
+
+model Notification {
+  id          String   @id @default(cuid())
+  companyId   String   @map("company_id")
+  userId      String?  @map("user_id")
+
+  type        String   // invoice_due, estimate_expiring, project_delayed, payment_reminder, etc.
+  priority    String   @default("normal") // low, normal, high, urgent
+  title       String
+  message     String
+  link        String?
+
+  relatedType String?  @map("related_type") // invoice, estimate, project, etc.
+  relatedId   String?  @map("related_id")
+
+  isRead      Boolean  @default(false) @map("is_read")
+  readAt      DateTime? @map("read_at")
+  isDismissed Boolean  @default(false) @map("is_dismissed")
+  dismissedAt DateTime? @map("dismissed_at")
+
+  scheduledFor DateTime? @map("scheduled_for")
+  sentAt      DateTime? @map("sent_at")
+  emailSent   Boolean  @default(false) @map("email_sent")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([companyId, isRead, isDismissed])
+  @@map("notifications")
 }
 
 // ============================================

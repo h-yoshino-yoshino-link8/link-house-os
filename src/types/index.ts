@@ -195,6 +195,8 @@ export interface EstimateDetail {
   estimateId: string;
   parentId?: string;
   sortOrder: number;
+  level: number; // 0: 大項目, 1: 中項目, 2: 小項目
+  isCategory: boolean; // カテゴリ行かどうか（子の合計を表示）
   name: string;
   specification?: string;
   quantity: number;

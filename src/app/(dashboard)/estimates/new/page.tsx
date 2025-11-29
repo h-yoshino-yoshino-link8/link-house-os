@@ -52,6 +52,10 @@ import {
   Wrench,
   Search,
   Check,
+  ChevronDown,
+  ChevronRight,
+  FolderPlus,
+  Layers,
 } from "lucide-react";
 import { UNITS } from "@/constants";
 import { useCustomers } from "@/hooks/use-customers";
@@ -61,14 +65,28 @@ import { useMaterials, useLaborTypes, Material, LaborType } from "@/hooks/use-ma
 import { useAppStore, DEMO_COMPANY_ID } from "@/stores/app-store";
 import { toast } from "sonner";
 
+// 階層レベルに応じた色
+const levelColors = [
+  "bg-blue-50 border-l-4 border-l-blue-500", // 大項目
+  "bg-green-50 border-l-4 border-l-green-500", // 中項目
+  "", // 小項目（通常行）
+];
+
+const levelLabels = ["大項目", "中項目", "小項目"];
+
 // 見積明細の行コンポーネント
 function EstimateDetailRow({
   detail,
   onUpdate,
   onRemove,
+  onAddChild,
+  onToggleExpanded,
+  hasChildren,
 }: {
   detail: {
     id: string;
+    parentId: string | null;
+    level: number;
     name: string;
     specification: string;
     quantity: number;
@@ -80,14 +98,93 @@ function EstimateDetailRow({
     profitRate: number;
     priceUnit: number;
     priceTotal: number;
+    isExpanded: boolean;
+    isCategory: boolean;
   };
   onUpdate: (id: string, updates: Partial<typeof detail>) => void;
   onRemove: (id: string) => void;
+  onAddChild: (parentId: string) => void;
+  onToggleExpanded: (id: string) => void;
+  hasChildren: boolean;
 }) {
+  const indent = detail.level * 24;
+
+  // カテゴリ行の場合
+  if (detail.isCategory) {
+    return (
+      <TableRow className={levelColors[detail.level] || ""}>
+        <TableCell className="w-8">
+          <div className="flex items-center gap-1" style={{ paddingLeft: indent }}>
+            {hasChildren && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => onToggleExpanded(detail.id)}
+              >
+                {detail.isExpanded ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </Button>
+            )}
+            <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+          </div>
+        </TableCell>
+        <TableCell colSpan={5}>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-xs">
+              {levelLabels[detail.level]}
+            </Badge>
+            <Input
+              value={detail.name}
+              onChange={(e) => onUpdate(detail.id, { name: e.target.value })}
+              placeholder={`${levelLabels[detail.level]}名`}
+              className="font-bold bg-transparent border-none shadow-none focus-visible:ring-0"
+            />
+          </div>
+        </TableCell>
+        <TableCell className="text-right font-medium">
+          ¥{Math.round(detail.costTotal).toLocaleString()}
+        </TableCell>
+        <TableCell></TableCell>
+        <TableCell></TableCell>
+        <TableCell className="text-right font-bold">
+          ¥{Math.round(detail.priceTotal).toLocaleString()}
+        </TableCell>
+        <TableCell>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => onAddChild(detail.id)}
+              title={detail.level < 2 ? "子項目を追加" : "明細を追加"}
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onRemove(detail.id)}
+              className="text-red-500 hover:text-red-700 h-6 w-6"
+            >
+              <Trash className="h-3 w-3" />
+            </Button>
+          </div>
+        </TableCell>
+      </TableRow>
+    );
+  }
+
+  // 通常の明細行
   return (
     <TableRow>
       <TableCell className="w-8">
-        <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+        <div style={{ paddingLeft: indent }}>
+          <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+        </div>
       </TableCell>
       <TableCell>
         <Input
@@ -141,7 +238,7 @@ function EstimateDetailRow({
         />
       </TableCell>
       <TableCell className="text-right font-medium">
-        ¥{detail.costTotal.toLocaleString()}
+        ¥{Math.round(detail.costTotal).toLocaleString()}
       </TableCell>
       <TableCell>
         <div className="flex items-center gap-2">
@@ -261,7 +358,7 @@ export default function NewEstimatePage() {
     };
   }, []);
 
-  // デフォルトの明細を追加
+  // デフォルトの明細を追加（フラット）
   const addDefaultDetail = () => {
     store.addDetail({
       name: "",
@@ -270,7 +367,59 @@ export default function NewEstimatePage() {
       costMaterial: 0,
       costLabor: 0,
       profitRate: store.globalProfitRate,
+      level: 0,
+      isCategory: false,
     });
+  };
+
+  // 大項目（カテゴリ）を追加
+  const addMajorCategory = () => {
+    store.addCategory("", 0, null);
+  };
+
+  // 子項目を追加
+  const handleAddChild = (parentId: string) => {
+    const parent = store.details.find((d) => d.id === parentId);
+    if (!parent) return;
+
+    if (parent.level < 1) {
+      // 大項目→中項目を追加
+      store.addCategory("", parent.level + 1, parentId);
+    } else {
+      // 中項目以下→明細を追加
+      store.addChildDetail(parentId, {
+        name: "",
+        quantity: 1,
+        unit: "式",
+        costMaterial: 0,
+        costLabor: 0,
+        profitRate: store.globalProfitRate,
+      });
+    }
+  };
+
+  // 階層的な表示順にソート
+  const getSortedDetails = () => {
+    const result: typeof store.details = [];
+    const rootItems = store.details.filter((d) => !d.parentId);
+
+    const addWithChildren = (item: typeof store.details[0], parentExpanded: boolean) => {
+      if (parentExpanded) {
+        result.push(item);
+      }
+      const children = store.details.filter((d) => d.parentId === item.id);
+      children.forEach((child) => {
+        addWithChildren(child, parentExpanded && item.isExpanded);
+      });
+    };
+
+    rootItems.forEach((item) => addWithChildren(item, true));
+    return result;
+  };
+
+  // 子を持つかどうか
+  const hasChildren = (id: string) => {
+    return store.details.some((d) => d.parentId === id);
   };
 
   // マスタから材料を追加
@@ -282,6 +431,8 @@ export default function NewEstimatePage() {
       costMaterial: Number(material.costPrice),
       costLabor: 0,
       profitRate: store.globalProfitRate,
+      level: 0,
+      isCategory: false,
     });
   };
 
@@ -294,6 +445,8 @@ export default function NewEstimatePage() {
       costMaterial: 0,
       costLabor: Number(labor.dailyRate),
       profitRate: store.globalProfitRate,
+      level: 0,
+      isCategory: false,
     });
   };
 
@@ -365,6 +518,9 @@ export default function NewEstimatePage() {
         internalMemo: store.internalMemo || undefined,
         details: store.details.map((d, i) => ({
           sortOrder: i,
+          parentId: d.parentId || undefined,
+          level: d.level,
+          isCategory: d.isCategory,
           name: d.name,
           specification: d.specification || undefined,
           quantity: d.quantity,
@@ -421,6 +577,9 @@ export default function NewEstimatePage() {
         internalMemo: store.internalMemo || undefined,
         details: store.details.map((d, i) => ({
           sortOrder: i,
+          parentId: d.parentId || undefined,
+          level: d.level,
+          isCategory: d.isCategory,
           name: d.name,
           specification: d.specification || undefined,
           quantity: d.quantity,
@@ -826,9 +985,13 @@ export default function NewEstimatePage() {
               <Button variant="outline" size="sm" disabled>
                 過去見積からコピー
               </Button>
+              <Button variant="outline" size="sm" onClick={addMajorCategory}>
+                <FolderPlus className="mr-2 h-4 w-4" />
+                大項目追加
+              </Button>
               <Button size="sm" onClick={addDefaultDetail}>
                 <Plus className="mr-2 h-4 w-4" />
-                行を追加
+                明細追加
               </Button>
             </div>
           </div>
@@ -855,22 +1018,32 @@ export default function NewEstimatePage() {
                 {store.details.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={11} className="h-32 text-center">
-                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                      <div className="flex flex-col items-center gap-4 text-muted-foreground">
+                        <Layers className="h-12 w-12" />
                         <p>明細がありません</p>
-                        <Button variant="outline" size="sm" onClick={addDefaultDetail}>
-                          <Plus className="mr-2 h-4 w-4" />
-                          最初の行を追加
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={addMajorCategory}>
+                            <FolderPlus className="mr-2 h-4 w-4" />
+                            大項目から始める
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={addDefaultDetail}>
+                            <Plus className="mr-2 h-4 w-4" />
+                            明細から始める
+                          </Button>
+                        </div>
                       </div>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  store.details.map((detail) => (
+                  getSortedDetails().map((detail) => (
                     <EstimateDetailRow
                       key={detail.id}
                       detail={detail}
                       onUpdate={store.updateDetail}
                       onRemove={store.removeDetail}
+                      onAddChild={handleAddChild}
+                      onToggleExpanded={store.toggleExpanded}
+                      hasChildren={hasChildren(detail.id)}
                     />
                   ))
                 )}
