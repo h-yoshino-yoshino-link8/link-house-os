@@ -1,6 +1,24 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, memo } from "react";
+import debounce from "lodash.debounce";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEstimateStore } from "@/stores/estimate-store";
@@ -74,8 +92,28 @@ const levelColors = [
 
 const levelLabels = ["大項目", "中項目", "小項目"];
 
-// 見積明細の行コンポーネント
-function EstimateDetailRow({
+// 見積明細の型定義
+interface EstimateDetailItem {
+  id: string;
+  parentId: string | null;
+  level: number;
+  name: string;
+  specification: string;
+  quantity: number;
+  unit: string;
+  costMaterial: number;
+  costLabor: number;
+  costUnit: number;
+  costTotal: number;
+  profitRate: number;
+  priceUnit: number;
+  priceTotal: number;
+  isExpanded: boolean;
+  isCategory: boolean;
+}
+
+// 見積明細の行コンポーネント（ドラッグ可能・memo化）
+const EstimateDetailRow = memo(function EstimateDetailRow({
   detail,
   onUpdate,
   onRemove,
@@ -83,36 +121,46 @@ function EstimateDetailRow({
   onToggleExpanded,
   hasChildren,
 }: {
-  detail: {
-    id: string;
-    parentId: string | null;
-    level: number;
-    name: string;
-    specification: string;
-    quantity: number;
-    unit: string;
-    costMaterial: number;
-    costLabor: number;
-    costUnit: number;
-    costTotal: number;
-    profitRate: number;
-    priceUnit: number;
-    priceTotal: number;
-    isExpanded: boolean;
-    isCategory: boolean;
-  };
-  onUpdate: (id: string, updates: Partial<typeof detail>) => void;
+  detail: EstimateDetailItem;
+  onUpdate: (id: string, updates: Partial<EstimateDetailItem>) => void;
   onRemove: (id: string) => void;
   onAddChild: (parentId: string) => void;
   onToggleExpanded: (id: string) => void;
   hasChildren: boolean;
 }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: detail.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
   const indent = detail.level * 24;
+
+  // debounced update for text inputs
+  const debouncedUpdate = useCallback(
+    debounce((id: string, updates: Partial<EstimateDetailItem>) => {
+      onUpdate(id, updates);
+    }, 300),
+    [onUpdate]
+  );
 
   // カテゴリ行の場合
   if (detail.isCategory) {
     return (
-      <TableRow className={levelColors[detail.level] || ""}>
+      <TableRow
+        ref={setNodeRef}
+        style={style}
+        className={`${levelColors[detail.level] || ""} ${isDragging ? "bg-blue-100" : ""}`}
+      >
         <TableCell className="w-8">
           <div className="flex items-center gap-1" style={{ paddingLeft: indent }}>
             {hasChildren && (
@@ -129,7 +177,9 @@ function EstimateDetailRow({
                 )}
               </Button>
             )}
-            <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+            <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
+              <GripVertical className="h-4 w-4 text-muted-foreground" />
+            </div>
           </div>
         </TableCell>
         <TableCell colSpan={5}>
@@ -138,8 +188,8 @@ function EstimateDetailRow({
               {levelLabels[detail.level]}
             </Badge>
             <Input
-              value={detail.name}
-              onChange={(e) => onUpdate(detail.id, { name: e.target.value })}
+              defaultValue={detail.name}
+              onChange={(e) => debouncedUpdate(detail.id, { name: e.target.value })}
               placeholder={`${levelLabels[detail.level]}名`}
               className="font-bold bg-transparent border-none shadow-none focus-visible:ring-0"
             />
@@ -180,16 +230,18 @@ function EstimateDetailRow({
 
   // 通常の明細行
   return (
-    <TableRow>
+    <TableRow ref={setNodeRef} style={style} className={isDragging ? "bg-blue-50" : ""}>
       <TableCell className="w-8">
         <div style={{ paddingLeft: indent }}>
-          <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+          <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
+            <GripVertical className="h-4 w-4 text-muted-foreground" />
+          </div>
         </div>
       </TableCell>
       <TableCell>
         <Input
-          value={detail.name}
-          onChange={(e) => onUpdate(detail.id, { name: e.target.value })}
+          defaultValue={detail.name}
+          onChange={(e) => debouncedUpdate(detail.id, { name: e.target.value })}
           placeholder="項目名"
           className="min-w-[150px]"
         />
@@ -197,8 +249,8 @@ function EstimateDetailRow({
       <TableCell>
         <Input
           type="number"
-          value={detail.quantity}
-          onChange={(e) => onUpdate(detail.id, { quantity: parseFloat(e.target.value) || 0 })}
+          defaultValue={detail.quantity}
+          onChange={(e) => debouncedUpdate(detail.id, { quantity: parseFloat(e.target.value) || 0 })}
           className="w-20 text-right"
         />
       </TableCell>
@@ -222,8 +274,8 @@ function EstimateDetailRow({
       <TableCell>
         <Input
           type="number"
-          value={detail.costMaterial}
-          onChange={(e) => onUpdate(detail.id, { costMaterial: parseFloat(e.target.value) || 0 })}
+          defaultValue={detail.costMaterial}
+          onChange={(e) => debouncedUpdate(detail.id, { costMaterial: parseFloat(e.target.value) || 0 })}
           className="w-28 text-right"
           placeholder="材料費"
         />
@@ -231,8 +283,8 @@ function EstimateDetailRow({
       <TableCell>
         <Input
           type="number"
-          value={detail.costLabor}
-          onChange={(e) => onUpdate(detail.id, { costLabor: parseFloat(e.target.value) || 0 })}
+          defaultValue={detail.costLabor}
+          onChange={(e) => debouncedUpdate(detail.id, { costLabor: parseFloat(e.target.value) || 0 })}
           className="w-28 text-right"
           placeholder="労務費"
         />
@@ -277,7 +329,7 @@ function EstimateDetailRow({
       </TableCell>
     </TableRow>
   );
-}
+});
 
 export default function NewEstimatePage() {
   const router = useRouter();
