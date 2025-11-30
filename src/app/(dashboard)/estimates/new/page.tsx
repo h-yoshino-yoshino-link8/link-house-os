@@ -474,6 +474,39 @@ export default function NewEstimatePage() {
     return store.details.some((d) => d.parentId === id);
   };
 
+  // dnd-kit センサー設定
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // 8px動かしてからドラッグ開始
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // ドラッグ終了時のハンドラー
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const sortedDetails = getSortedDetails();
+      const oldIndex = sortedDetails.findIndex((d) => d.id === active.id);
+      const newIndex = sortedDetails.findIndex((d) => d.id === over.id);
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        // 並び替えを実行
+        const newOrder = arrayMove(sortedDetails, oldIndex, newIndex);
+
+        // ストアの順序を更新（sortOrderを再計算）
+        newOrder.forEach((detail, index) => {
+          store.updateDetail(detail.id, { sortOrder: index });
+        });
+      }
+    }
+  }, [store]);
+
   // マスタから材料を追加
   const addMaterialToDetail = (material: Material) => {
     store.addDetail({
@@ -1066,40 +1099,51 @@ export default function NewEstimatePage() {
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
-                {store.details.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={11} className="h-32 text-center">
-                      <div className="flex flex-col items-center gap-4 text-muted-foreground">
-                        <Layers className="h-12 w-12" />
-                        <p>明細がありません</p>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={addMajorCategory}>
-                            <FolderPlus className="mr-2 h-4 w-4" />
-                            大項目から始める
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={addDefaultDetail}>
-                            <Plus className="mr-2 h-4 w-4" />
-                            明細から始める
-                          </Button>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <TableBody>
+                  {store.details.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={11} className="h-32 text-center">
+                        <div className="flex flex-col items-center gap-4 text-muted-foreground">
+                          <Layers className="h-12 w-12" />
+                          <p>明細がありません</p>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={addMajorCategory}>
+                              <FolderPlus className="mr-2 h-4 w-4" />
+                              大項目から始める
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={addDefaultDetail}>
+                              <Plus className="mr-2 h-4 w-4" />
+                              明細から始める
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  getSortedDetails().map((detail) => (
-                    <EstimateDetailRow
-                      key={detail.id}
-                      detail={detail}
-                      onUpdate={store.updateDetail}
-                      onRemove={store.removeDetail}
-                      onAddChild={handleAddChild}
-                      onToggleExpanded={store.toggleExpanded}
-                      hasChildren={hasChildren(detail.id)}
-                    />
-                  ))
-                )}
-              </TableBody>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    <SortableContext
+                      items={getSortedDetails().map((d) => d.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {getSortedDetails().map((detail) => (
+                        <EstimateDetailRow
+                          key={detail.id}
+                          detail={detail}
+                          onUpdate={store.updateDetail}
+                          onRemove={store.removeDetail}
+                          onAddChild={handleAddChild}
+                          onToggleExpanded={store.toggleExpanded}
+                          hasChildren={hasChildren(detail.id)}
+                        />
+                      ))}
+                    </SortableContext>
+                  )}
+                </TableBody>
+              </DndContext>
             </Table>
           </div>
 
